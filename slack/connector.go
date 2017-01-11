@@ -21,11 +21,10 @@ type SlackConnector struct {
 	eventChan chan *bot.Event
 	idle      chan bool
 
-	token       string
-	bufChan     chan []byte
-	startTime   int
-	connection  *websocket.Conn
-	profileIcon string
+	token      string
+	bufChan    chan []byte
+	startTime  int
+	connection *websocket.Conn
 }
 
 type Ping struct {
@@ -79,17 +78,16 @@ var (
 	ErrFailedPostMessage = errors.New("Failed chat.postMessage")
 )
 
-func NewSlackConnector(token string, profileIcon string) *SlackConnector {
+func NewSlackConnector(token string) *SlackConnector {
 	startTime := int(time.Now().Unix())
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &SlackConnector{
-		ctx:         ctx,
-		cancel:      cancel,
-		token:       token,
-		startTime:   startTime,
-		eventChan:   make(chan *bot.Event),
-		profileIcon: profileIcon,
+		ctx:       ctx,
+		cancel:    cancel,
+		token:     token,
+		startTime: startTime,
+		eventChan: make(chan *bot.Event),
 	}
 }
 
@@ -195,8 +193,7 @@ func (this *SlackConnector) Send(event *bot.Event, username string, text string)
 	v.Set("token", this.token)
 	v.Set("channel", event.Channel)
 	v.Set("text", text)
-	v.Set("username", username)
-	v.Set("icon_url", this.profileIcon)
+	v.Set("as_user", "false")
 
 	response, err := http.PostForm("https://slack.com/api/chat.postMessage", v)
 	if err != nil {
@@ -222,6 +219,7 @@ func (this *SlackConnector) SendWithConfirm(event *bot.Event, username, text str
 	v.Set("token", this.token)
 	v.Set("channel", event.Channel)
 	v.Set("text", text)
+	v.Set("as_user", "false")
 	v.Set("username", username)
 	v.Set("icon_url", this.profileIcon)
 
