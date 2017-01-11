@@ -198,7 +198,11 @@ func (this *SlackConnector) Send(event *bot.Event, username string, text string)
 	v.Set("username", username)
 	v.Set("icon_url", this.profileIcon)
 
-	response, _ := http.PostForm("https://slack.com/api/chat.postMessage", v)
+	response, err := http.PostForm("https://slack.com/api/chat.postMessage", v)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
 	dec := json.NewDecoder(response.Body)
 	var data struct {
 		Ok bool   `json:"ok"`
