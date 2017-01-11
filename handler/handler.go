@@ -5,21 +5,35 @@ import (
 )
 
 type Cmd struct {
+	Type        string
 	Pattern     string
 	Description string
 	Handler     func(*bot.Event)
 }
 
+const (
+	typeCmdWithArgv = "cmd_with_argv"
+)
+
 var commands = make([]*Cmd, 0)
 
 func Init(bot *bot.Bot) {
 	for _, c := range commands {
-		bot.Command(c.Pattern, c.Description, c.Handler)
+		switch c.Type {
+		case typeCmdWithArgv:
+			bot.CommandWithArgv(c.Pattern, c.Description, c.Handler)
+		default:
+			bot.Command(c.Pattern, c.Description, c.Handler)
+		}
 	}
 }
 
 func AddCommand(pattern, description string, handler func(*bot.Event)) {
 	commands = append(commands, &Cmd{Pattern: pattern, Description: description, Handler: handler})
+}
+
+func AddCommandWithArgv(pattern, description string, handler func(*bot.Event)) {
+	commands = append(commands, &Cmd{Type: typeCmdWithArgv, Pattern: pattern, Description: description, Handler: handler})
 }
 
 func ShowHelp() string {

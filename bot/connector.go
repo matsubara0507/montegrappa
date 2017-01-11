@@ -24,7 +24,7 @@ const (
 type Event struct {
 	Type        string
 	Message     string
-	Argv        string
+	Argv        []string
 	Channel     string
 	User        string
 	Reaction    string

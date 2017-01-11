@@ -1,8 +1,8 @@
 package bot
 
 import (
-	"log"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -135,7 +135,7 @@ func (this *EventHandler) Handle(event *Event, async bool) {
 			if command.pattern.MatchString(event.Message) == true {
 				if command.argv == true {
 					matched := command.pattern.FindStringSubmatch(event.Message)
-					event.Argv = matched[1]
+					event.Argv = strings.Fields(matched[1])
 				} else {
 				}
 

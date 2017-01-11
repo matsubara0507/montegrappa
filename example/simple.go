@@ -30,5 +30,10 @@ func main() {
 		res := <-resChan
 		msg.Say(res)
 	})
+	robot.CommandWithArgv("test2", "test2", func(msg *bot.Event) {
+		for _, v := range msg.Argv {
+			msg.Say(v)
+		}
+	})
 	robot.Start()
 }
