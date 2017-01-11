@@ -28,7 +28,8 @@ func UpdateLastStart() error {
 		seq, _ := b.NextSequence()
 		buf := make([]byte, 8)
 		binary.BigEndian.PutUint64(buf, seq)
-		return b.Put([]byte("seq"), buf)
+		err = b.Put([]byte("seq"), buf)
+		return err
 	})
 }
 
@@ -44,6 +45,9 @@ func ReadInstanceInfo() (*InstanceInfo, error) {
 	defer tx.Rollback()
 
 	b := tx.Bucket(BucketGlobal)
+	if b == nil {
+		return nil, ErrNotExistBucket
+	}
 	s := b.Get([]byte("start_at"))
 	instanceInfo := new(InstanceInfo)
 	if s != nil {
@@ -53,4 +57,47 @@ func ReadInstanceInfo() (*InstanceInfo, error) {
 	instanceInfo.Seq = binary.BigEndian.Uint64(s)
 
 	return instanceInfo, nil
+}
+
+func GetConfig(key string) (string, error) {
+	if conn == nil {
+		return "", ErrNotOpenDB
+	}
+
+	tx, err := conn.Begin(false)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+
+	b := tx.Bucket(BucketGlobal)
+	if b == nil {
+		return "", ErrNotExistBucket
+	}
+	s := b.Get([]byte(key))
+	if s == nil {
+		return "", nil
+	}
+
+	return string(s), nil
+}
+
+func SetConfig(key, value string) (error) {
+	if conn == nil {
+		return ErrNotOpenDB
+	}
+
+	err := conn.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists(BucketGlobal)
+		if err != nil {
+			return err
+		}
+		err = b.Put([]byte(key), []byte(value))
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return err
 }

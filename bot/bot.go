@@ -54,9 +54,9 @@ func (self *Bot) Start() {
 		case event := <-self.connector.ReceivedEvent():
 			event.Bot = self
 			if self.connector.Async() == true {
-				go self.eventHandler.Handle(event)
+				go self.eventHandler.Handle(event, true)
 			} else {
-				self.eventHandler.Handle(event)
+				self.eventHandler.Handle(event, false)
 				self.connector.Idle() <- true
 			}
 		case <-self.connectErrorChan:
@@ -73,6 +73,11 @@ func (self *Bot) Send(event *Event, text string) {
 func (self *Bot) SendWithConfirm(event *Event, text, reaction string, callback func(*Event)) {
 	id, _ := self.connector.SendWithConfirm(event, self.name, text)
 	self.eventHandler.RequireReaction(event.Channel, id, reaction, callback)
+}
+
+func (self *Bot) SendRequireResponse(event *Event, text string) (func(), chan string) {
+	self.connector.Send(event, self.name, text)
+	return self.eventHandler.RequireResponse(event.Channel, event.User)
 }
 
 func (self *Bot) Hear(pattern string, callback func(*Event)) {

@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"log"
 	"regexp"
 	"sync"
 	"time"
@@ -13,9 +14,11 @@ type EventHandler struct {
 }
 
 type Command struct {
+	CommandType string
 	eventType   string
 	description string
 	pattern     *regexp.Regexp
+	channel     string
 	user        string
 	argv        bool
 	messageId   string
@@ -23,6 +26,10 @@ type Command struct {
 	callback    func(*Event)
 	createdAt   time.Time
 }
+
+const (
+	CommandTypeRequireResponse = "require_response"
+)
 
 var (
 	ReactionExpire = 3 * time.Minute
@@ -69,6 +76,33 @@ func (this *EventHandler) RemoveRequireReaction(eventId, reaction string) {
 	this.commands[ReactionAddedEvent] = newCommands
 }
 
+func (this *EventHandler) RequireResponse(channel, user string) (func(), chan string) {
+	resChan := make(chan string)
+	callback := func(msg *Event) {
+		resChan <- msg.Message
+	}
+	cancelFunc := func() {
+		go this.RemoveRequireResponse(channel, user)
+	}
+	c := &Command{CommandType: CommandTypeRequireResponse, channel: channel, user: user, callback: callback}
+	go this.AddHandler(MessageEvent, c)
+	return cancelFunc, resChan
+}
+
+func (this *EventHandler) RemoveRequireResponse(channel, user string) {
+	this.mutex.Lock()
+	defer this.mutex.Unlock()
+
+	newCommands := make([]Command, 0)
+	for _, c := range this.commands[MessageEvent] {
+		if c.CommandType == CommandTypeRequireResponse && c.channel == channel && c.user == user {
+			continue
+		}
+		newCommands = append(newCommands, c)
+	}
+	this.commands[MessageEvent] = newCommands
+}
+
 func (this *EventHandler) AddHandler(eventType string, command *Command) {
 	this.mutex.Lock()
 	defer this.mutex.Unlock()
@@ -79,7 +113,7 @@ func (this *EventHandler) AddHandler(eventType string, command *Command) {
 	this.commands[eventType] = append(this.commands[eventType], *command)
 }
 
-func (this *EventHandler) Handle(event *Event) {
+func (this *EventHandler) Handle(event *Event, async bool) {
 	if _, ok := this.ignoreUsers[event.User]; ok == true {
 		return
 	}
@@ -89,11 +123,24 @@ func (this *EventHandler) Handle(event *Event) {
 	for _, command := range this.commands[event.Type] {
 		switch event.Type {
 		case MessageEvent:
+			if command.CommandType == CommandTypeRequireResponse && event.Channel == command.channel && event.User == command.user {
+				if async {
+					go command.callback(event)
+				} else {
+					command.callback(event)
+				}
+				return
+			}
+
 			if command.pattern.MatchString(event.Message) == true {
 				if command.argv == true {
 					matched := command.pattern.FindStringSubmatch(event.Message)
 					event.Argv = matched[1]
-					command.callback(event)
+				} else {
+				}
+
+				if async {
+					go command.callback(event)
 				} else {
 					command.callback(event)
 				}

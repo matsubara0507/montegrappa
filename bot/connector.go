@@ -46,6 +46,10 @@ func (self *Event) SayWithConfirm(text, reaction string, callback func(*Event)) 
 	self.Bot.SendWithConfirm(self, text, reaction, callback)
 }
 
+func (self *Event) SayRequireResponse(text string) (func(), chan string) {
+	return self.Bot.SendRequireResponse(self, text)
+}
+
 type SendedMessage struct {
 	Message   string
 	Channel   string

@@ -9,8 +9,9 @@ import (
 
 var conn *bolt.DB
 var (
-	ErrNotExistToken = errors.New("Not exist access token")
-	ErrNotOpenDB     = errors.New("Not open database")
+	ErrNotExistToken  = errors.New("Not exist access token")
+	ErrNotOpenDB      = errors.New("Not open database")
+	ErrNotExistBucket = errors.New("Not exist bucket")
 )
 
 var (
