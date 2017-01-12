@@ -63,6 +63,14 @@ func (self *Event) SayRequireResponsef(format string, a ...interface{}) (func(),
 	return self.Bot.SendRequireResponsef(self, format, a...)
 }
 
+func (self *Event) Reply(text string) {
+	self.Bot.Sendf(self, "%l: %s", self.User, text)
+}
+
+func (self *Event) Reply(format string, a ...interface{}) {
+	self.Bot.Sendf(self, "%l:"+format, self.User, a...)
+}
+
 type SendedMessage struct {
 	Message   string
 	Channel   string
