@@ -67,7 +67,7 @@ func (self *Event) Reply(text string) {
 	self.Bot.Sendf(self, "%l: %s", self.User, text)
 }
 
-func (self *Event) Reply(format string, a ...interface{}) {
+func (self *Event) Replyf(format string, a ...interface{}) {
 	self.Bot.Sendf(self, "%l:"+format, self.User, a...)
 }
 
