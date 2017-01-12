@@ -131,6 +131,9 @@ func (this *EventHandler) Handle(event *Event, async bool) {
 				}
 				return
 			}
+			if command.CommandType == CommandTypeRequireResponse {
+				return
+			}
 
 			if command.pattern.MatchString(event.Message) == true {
 				if command.argv == true {
