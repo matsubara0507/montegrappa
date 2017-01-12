@@ -68,7 +68,7 @@ func (self *Event) Reply(text string) {
 }
 
 func (self *Event) Replyf(format string, a ...interface{}) {
-	self.Bot.Sendf(self, "%l:"+format, self.User, a...)
+	self.Bot.Sendf(self, fmt.Sprintf("%l: %s", self.User, format), a...)
 }
 
 type SendedMessage struct {
