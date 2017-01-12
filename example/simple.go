@@ -9,14 +9,13 @@ import (
 
 func main() {
 	Token := os.Getenv("SLACK_TOKEN")
-	ProfileIcon := ""
 	BotName := "debug"
 	IgnoreUsers := make([]string, 0)
 
-	connector := slack.NewSlackConnector(Token, ProfileIcon)
+	connector := slack.NewSlackConnector(Token)
 	robot := bot.NewBot(connector, BotName, IgnoreUsers)
 	robot.Command("ping", "ping pong", func(msg *bot.Event) {
-		msg.Say("pong")
+		msg.Sayf("pong %l", msg.User)
 	})
 	robot.Command("test", "test", func(msg *bot.Event) {
 		cancelFunc, resChan := msg.SayRequireResponse("どうしましたか？")

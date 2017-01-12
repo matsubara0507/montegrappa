@@ -142,7 +142,7 @@ func (this *SlackConnector) Listen() error {
 				botEvent.Type = bot.MessageEvent
 				botEvent.Message = messageEvent.Text
 				botEvent.Channel = messageEvent.Channel
-				botEvent.User = messageEvent.User
+				botEvent.User.Id = messageEvent.User
 				botEvent.Ts = messageEvent.Ts
 			case "user_typing":
 				var userTypingEvent UserTyping
@@ -153,7 +153,7 @@ func (this *SlackConnector) Listen() error {
 
 				botEvent.Type = bot.UserTypingEvent
 				botEvent.Channel = userTypingEvent.Channel
-				botEvent.User = userTypingEvent.User
+				botEvent.User.Id = userTypingEvent.User
 			case "pong":
 				log.Print("receive pong")
 				continue
@@ -166,7 +166,7 @@ func (this *SlackConnector) Listen() error {
 				}
 				botEvent.Channel = reactionAdded.Item.Channel
 				botEvent.Ts = reactionAdded.Item.Ts
-				botEvent.User = reactionAdded.ItemUser
+				botEvent.User.Id = reactionAdded.ItemUser
 				botEvent.Reaction = reactionAdded.Reaction
 			default:
 				botEvent.Type = bot.UnknownEvent
@@ -221,7 +221,6 @@ func (this *SlackConnector) SendWithConfirm(event *bot.Event, username, text str
 	v.Set("text", text)
 	v.Set("as_user", "false")
 	v.Set("username", username)
-	v.Set("icon_url", this.profileIcon)
 
 	response, _ := http.PostForm("https://slack.com/api/chat.postMessage", v)
 	dec := json.NewDecoder(response.Body)

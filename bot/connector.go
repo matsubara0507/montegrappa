@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -26,7 +27,7 @@ type Event struct {
 	Message     string
 	Argv        []string
 	Channel     string
-	User        string
+	User        User
 	Reaction    string
 	Ts          string
 	Timestamp   time.Time
@@ -42,16 +43,41 @@ func (self *Event) Say(text string) {
 	self.Bot.Send(self, text)
 }
 
+func (self *Event) Sayf(format string, a ...interface{}) {
+	self.Bot.Sendf(self, format, a...)
+}
+
 func (self *Event) SayWithConfirm(text, reaction string, callback func(*Event)) {
 	self.Bot.SendWithConfirm(self, text, reaction, callback)
+}
+
+func (self *Event) SayWithConfirmf(reaction string, callback func(*Event), format string, a ...interface{}) {
+	self.Bot.SendWithConfirmf(self, reaction, callback, format, a...)
 }
 
 func (self *Event) SayRequireResponse(text string) (func(), chan string) {
 	return self.Bot.SendRequireResponse(self, text)
 }
 
+func (self *Event) SayRequireResponsef(format string, a ...interface{}) (func(), chan string) {
+	return self.Bot.SendRequireResponsef(self, format, a...)
+}
+
 type SendedMessage struct {
 	Message   string
 	Channel   string
 	Timestamp string
+}
+
+type User struct {
+	Id   string
+	Name string
+}
+
+func (user User) Format(f fmt.State, c rune) {
+	if c == 'l' {
+		fmt.Fprint(f, "<@"+user.Id+">")
+		return
+	}
+	fmt.Fprint(f, user.Name)
 }

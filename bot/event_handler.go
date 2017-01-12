@@ -114,7 +114,7 @@ func (this *EventHandler) AddHandler(eventType string, command *Command) {
 }
 
 func (this *EventHandler) Handle(event *Event, async bool) {
-	if _, ok := this.ignoreUsers[event.User]; ok == true {
+	if _, ok := this.ignoreUsers[event.User.Id]; ok == true {
 		return
 	}
 
@@ -123,7 +123,7 @@ func (this *EventHandler) Handle(event *Event, async bool) {
 	for _, command := range this.commands[event.Type] {
 		switch event.Type {
 		case MessageEvent:
-			if command.CommandType == CommandTypeRequireResponse && event.Channel == command.channel && event.User == command.user {
+			if command.CommandType == CommandTypeRequireResponse && event.Channel == command.channel && event.User.Id == command.user {
 				if async {
 					go command.callback(event)
 				} else {
@@ -147,7 +147,7 @@ func (this *EventHandler) Handle(event *Event, async bool) {
 				return
 			}
 		case UserTypingEvent:
-			if event.User == command.user {
+			if event.User.Id == command.user {
 				command.callback(event)
 			}
 		case ReactionAddedEvent:

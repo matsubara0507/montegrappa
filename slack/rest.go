@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 )
 
 var (
@@ -21,7 +22,7 @@ type UserInfoResponse struct {
 }
 
 func (slackConnector *SlackConnector) GetUserInfo(userId string) (*UserInfo, error) {
-	v := &url.Values{}
+	v := url.Values{}
 	v.Set("token", slackConnector.token)
 	v.Set("user", userId)
 

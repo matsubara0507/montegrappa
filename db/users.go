@@ -1,9 +1,9 @@
 package db
 
 import (
-	"github.com/boltdb/bolt"
-	"errors"
 	"encoding/json"
+	"errors"
+	"github.com/boltdb/bolt"
 )
 
 var (
@@ -15,7 +15,7 @@ var (
 )
 
 type User struct {
-	Id string `json:"id"`
+	Id   string `json:"id"`
 	Name string `json:"name"`
 }
 
@@ -32,10 +32,10 @@ func GetUser(userId string) (*User, error) {
 
 	b := tx.Bucket(BucketUsers)
 	if b == nil {
-		return "", ErrNotExistBucket
+		return nil, ErrNotExistBucket
 	}
 	s := b.Get([]byte(userId))
-	if == nil {
+	if s == nil {
 		return nil, ErrUserNotFound
 	}
 	u := new(User)
@@ -49,10 +49,10 @@ func GetUser(userId string) (*User, error) {
 
 func WriteUser(user *User) error {
 	if conn == nil {
-		return nil, ErrNotOpenDB
+		return ErrNotOpenDB
 	}
 
-	return conn.Update(func (tx *bolt.Tx) error {
+	return conn.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(BucketUsers)
 		if err != nil {
 			return err

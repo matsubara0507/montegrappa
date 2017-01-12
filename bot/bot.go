@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"fmt"
 	"log"
 	"regexp"
 )
@@ -70,14 +71,29 @@ func (self *Bot) Send(event *Event, text string) {
 	self.connector.Send(event, self.name, text)
 }
 
+func (self *Bot) Sendf(event *Event, format string, a ...interface{}) {
+	text := fmt.Sprintf(format, a...)
+	self.Send(event, text)
+}
+
 func (self *Bot) SendWithConfirm(event *Event, text, reaction string, callback func(*Event)) {
 	id, _ := self.connector.SendWithConfirm(event, self.name, text)
 	self.eventHandler.RequireReaction(event.Channel, id, reaction, callback)
 }
 
+func (self *Bot) SendWithConfirmf(event *Event, reaction string, callback func(*Event), format string, a ...interface{}) {
+	text := fmt.Sprintf(format, a)
+	self.SendWithConfirm(event, text, reaction, callback)
+}
+
 func (self *Bot) SendRequireResponse(event *Event, text string) (func(), chan string) {
 	self.connector.Send(event, self.name, text)
-	return self.eventHandler.RequireResponse(event.Channel, event.User)
+	return self.eventHandler.RequireResponse(event.Channel, event.User.Id)
+}
+
+func (self *Bot) SendRequireResponsef(event *Event, format string, a ...interface{}) (func(), chan string) {
+	text := fmt.Sprintf(format, a)
+	return self.SendRequireResponse(event, text)
 }
 
 func (self *Bot) Hear(pattern string, callback func(*Event)) {
