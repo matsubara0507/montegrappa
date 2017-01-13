@@ -139,7 +139,6 @@ func (this *EventHandler) Handle(event *Event, async bool) {
 				if command.argv == true {
 					matched := command.pattern.FindStringSubmatch(event.Message)
 					event.Argv = strings.Fields(matched[1])
-				} else {
 				}
 
 				if async {

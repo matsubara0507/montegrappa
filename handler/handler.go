@@ -40,7 +40,7 @@ func AddCommandWithArgv(pattern, description string, handler func(*bot.Event)) {
 }
 
 func Hear(pattern string, handler func(*bot.Event)) {
-	commands = append(commands, &Cmd{Type: typeHear, Pattern: pattern})
+	commands = append(commands, &Cmd{Type: typeHear, Pattern: pattern, Handler: handler})
 }
 
 func ShowHelp() string {
