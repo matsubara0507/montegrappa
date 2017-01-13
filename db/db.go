@@ -28,6 +28,10 @@ func Open(name string) error {
 	return nil
 }
 
+func GetConn() *bolt.DB {
+	return conn
+}
+
 func GetToken() (string, error) {
 	token, err := getStringValue(BucketAuthenticationInformation, []byte("access_token"))
 	if token == "" && err == nil {
