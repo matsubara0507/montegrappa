@@ -1,6 +1,13 @@
 package bot
 
-type TestConnector struct {}
+import (
+	"sync"
+)
+
+type TestConnector struct {
+	SendMessages []string
+	sync         sync.RWMutex
+}
 
 func NewTestConnector() *TestConnector {
 	return &TestConnector{}
@@ -17,11 +24,17 @@ func (c *TestConnector) ReceivedEvent() chan *Event {
 	return make(chan *Event)
 }
 
-func (c *TestConnector) Send(_ *Event, _ string, _ string) error {
+func (c *TestConnector) Send(_ *Event, text string, _ string) error {
+	c.sync.Lock()
+	defer c.sync.Unlock()
+	c.SendMessages = append(c.SendMessages, text)
 	return nil
 }
 
-func (c *TestConnector) SendWithConfirm(_ *Event, _ string, _ string) (string, error) {
+func (c *TestConnector) SendWithConfirm(_ *Event, text string, _ string) (string, error) {
+	c.sync.Lock()
+	defer c.sync.Unlock()
+	c.SendMessages = append(c.SendMessages, text)
 	return "", nil
 }
 
