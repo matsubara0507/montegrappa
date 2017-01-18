@@ -24,6 +24,14 @@ func (c *TestConnector) ReceivedEvent() chan *Event {
 	return make(chan *Event)
 }
 
+func (c *TestConnector) GetChannelInfo(channel string) (*ChannelInfo, error) {
+	ci := &ChannelInfo{
+		Id:   channel,
+		Name: channel,
+	}
+	return ci, nil
+}
+
 func (c *TestConnector) Send(_ *Event, text string, _ string) error {
 	c.sync.Lock()
 	defer c.sync.Unlock()

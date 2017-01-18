@@ -13,6 +13,7 @@ type Connector interface {
 	SendWithConfirm(*Event, string, string) (string, error)
 	Async() bool
 	Idle() chan bool
+	GetChannelInfo(string) (*ChannelInfo, error)
 }
 
 const (
@@ -37,6 +38,15 @@ type Event struct {
 
 func (event *Event) EventId() string {
 	return event.Channel + event.Ts
+}
+
+func (event *Event) ChannelName() (string, error) {
+	channelInfo, err := event.Bot.Connector.GetChannelInfo(event.Channel)
+	if err != nil {
+		return "", err
+	}
+
+	return channelInfo.Name, nil
 }
 
 func (self *Event) Say(text string) {
@@ -88,4 +98,9 @@ func (user User) Format(f fmt.State, c rune) {
 		return
 	}
 	fmt.Fprint(f, user.Name)
+}
+
+type ChannelInfo struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
 }

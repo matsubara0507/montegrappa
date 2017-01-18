@@ -11,7 +11,7 @@ var (
 )
 
 type Bot struct {
-	connector        Connector
+	Connector        Connector
 	name             string
 	connectErrorChan chan bool
 	eventHandler     *EventHandler
@@ -27,7 +27,7 @@ func NewBot(connector Connector, name string, ignoreUsers []string) *Bot {
 	}
 
 	bot := &Bot{
-		connector:        connector,
+		Connector:        connector,
 		name:             name,
 		connectErrorChan: make(chan bool),
 		eventHandler:     NewEventHandler(ignoreUsers),
@@ -38,10 +38,10 @@ func NewBot(connector Connector, name string, ignoreUsers []string) *Bot {
 }
 
 func (self *Bot) Connect() {
-	self.connector.Connect()
+	self.Connector.Connect()
 
 	go func() {
-		res := self.connector.Listen()
+		res := self.Connector.Listen()
 		if res != nil {
 			self.connectErrorChan <- true
 		}
@@ -52,13 +52,13 @@ func (self *Bot) Start() {
 	self.Connect()
 	for {
 		select {
-		case event := <-self.connector.ReceivedEvent():
+		case event := <-self.Connector.ReceivedEvent():
 			event.Bot = self
-			if self.connector.Async() == true {
+			if self.Connector.Async() == true {
 				go self.eventHandler.Handle(event, true)
 			} else {
 				self.eventHandler.Handle(event, false)
-				self.connector.Idle() <- true
+				self.Connector.Idle() <- true
 			}
 		case <-self.connectErrorChan:
 			log.Print("reconnect")
@@ -68,7 +68,7 @@ func (self *Bot) Start() {
 }
 
 func (self *Bot) Send(event *Event, text string) {
-	self.connector.Send(event, self.name, text)
+	self.Connector.Send(event, self.name, text)
 }
 
 func (self *Bot) Sendf(event *Event, format string, a ...interface{}) {
@@ -77,7 +77,7 @@ func (self *Bot) Sendf(event *Event, format string, a ...interface{}) {
 }
 
 func (self *Bot) SendWithConfirm(event *Event, text, reaction string, callback func(*Event)) {
-	id, _ := self.connector.SendWithConfirm(event, self.name, text)
+	id, _ := self.Connector.SendWithConfirm(event, self.name, text)
 	self.eventHandler.RequireReaction(event.Channel, id, reaction, callback)
 }
 
@@ -87,7 +87,7 @@ func (self *Bot) SendWithConfirmf(event *Event, reaction string, callback func(*
 }
 
 func (self *Bot) SendRequireResponse(event *Event, text string) (func(), chan string) {
-	self.connector.Send(event, self.name, text)
+	self.Connector.Send(event, self.name, text)
 	return self.eventHandler.RequireResponse(event.Channel, event.User.Id)
 }
 

@@ -3,12 +3,14 @@ package slack
 import (
 	"encoding/json"
 	"errors"
+	"github.com/f110/montegrappa/bot"
 	"net/http"
 	"net/url"
 )
 
 var (
-	ErrUserNotFound = errors.New("user not found")
+	ErrUserNotFound    = errors.New("user not found")
+	ErrChannelNotFound = errors.New("channel not found")
 )
 
 type UserInfo struct {
@@ -19,6 +21,11 @@ type UserInfo struct {
 type UserInfoResponse struct {
 	Ok   bool     `json:"ok"`
 	User UserInfo `json:"user"`
+}
+
+type ChannelInfoResponse struct {
+	Ok      bool            `json:"ok"`
+	Channel bot.ChannelInfo `json:"channel"`
 }
 
 func (slackConnector *SlackConnector) GetUserInfo(userId string) (*UserInfo, error) {
@@ -41,4 +48,25 @@ func (slackConnector *SlackConnector) GetUserInfo(userId string) (*UserInfo, err
 	}
 
 	return &resObj.User, nil
+}
+
+func (slackConnector *SlackConnector) GetChannelInfo(channelId string) (*bot.ChannelInfo, error) {
+	v := url.Values{}
+	v.Set("token", slackConnector.token)
+	v.Set("channel", channelId)
+	res, err := http.PostForm("https://slack.com/api/channels.info", v)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	d := json.NewDecoder(res.Body)
+	resObj := new(ChannelInfoResponse)
+	d.Decode(resObj)
+
+	if resObj.Ok == false {
+		return nil, ErrChannelNotFound
+	}
+
+	return &resObj.Channel, nil
 }
