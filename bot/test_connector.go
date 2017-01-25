@@ -32,14 +32,14 @@ func (c *TestConnector) GetChannelInfo(channel string) (*ChannelInfo, error) {
 	return ci, nil
 }
 
-func (c *TestConnector) Send(_ *Event, text string, _ string) error {
+func (c *TestConnector) Send(_ *Event, _username string, text string) error {
 	c.sync.Lock()
 	defer c.sync.Unlock()
 	c.SendMessages = append(c.SendMessages, text)
 	return nil
 }
 
-func (c *TestConnector) SendWithConfirm(_ *Event, text string, _ string) (string, error) {
+func (c *TestConnector) SendWithConfirm(_ *Event, _username string, text string) (string, error) {
 	c.sync.Lock()
 	defer c.sync.Unlock()
 	c.SendMessages = append(c.SendMessages, text)
