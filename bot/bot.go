@@ -96,6 +96,12 @@ func (self *Bot) SendRequireResponsef(event *Event, format string, a ...interfac
 	return self.SendRequireResponse(event, text)
 }
 
+func (self *Bot) WithIndicate(channel string, f func() error) {
+	cancel := self.Connector.WithIndicate(channel)
+	defer cancel()
+	f()
+}
+
 func (self *Bot) Hear(pattern string, callback func(*Event)) {
 	self.eventHandler.AddCommand(regexp.MustCompile(pattern), "", callback, false)
 }
