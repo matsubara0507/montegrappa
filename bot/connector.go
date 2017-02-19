@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
@@ -11,6 +12,7 @@ type Connector interface {
 	ReceivedEvent() chan *Event
 	Send(*Event, string, string) error
 	SendWithConfirm(*Event, string, string) (string, error)
+	WithIndicate(string) context.CancelFunc
 	Async() bool
 	Idle() chan bool
 	GetChannelInfo(string) (*ChannelInfo, error)
@@ -79,6 +81,10 @@ func (self *Event) Reply(text string) {
 
 func (self *Event) Replyf(format string, a ...interface{}) {
 	self.Bot.Sendf(self, fmt.Sprintf("%l: %s", self.User, format), a...)
+}
+
+func (self *Event) WithIndicate(f func() error) {
+	self.Bot.WithIndicate(self.Channel, f)
 }
 
 type SendedMessage struct {

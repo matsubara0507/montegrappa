@@ -33,6 +33,12 @@ type Ping struct {
 	Time int    `json:"time"`
 }
 
+type Typing struct {
+	Id      int    `json:"id"`
+	Type    string `json:"type"`
+	Channel string `json:"channel"`
+}
+
 type Event struct {
 	Type string
 	Ts   string
@@ -237,6 +243,25 @@ func (this *SlackConnector) SendWithConfirm(event *bot.Event, username, text str
 	return data.Ts, nil
 }
 
+func (this *SlackConnector) WithIndicate(channel string) context.CancelFunc {
+	ctx, cancel := context.WithCancel(this.ctx)
+
+	go func(c string) {
+		t := time.Tick(2 * time.Second)
+	LOOP:
+		for {
+			select {
+			case <-ctx.Done():
+				break LOOP
+			case <-t:
+				this.sendTyping(c)
+			}
+		}
+	}(channel)
+
+	return cancel
+}
+
 func (this *SlackConnector) startReading() {
 	log.Print("start reading")
 	var msg []byte
@@ -306,6 +331,23 @@ func (this *SlackConnector) sendPing(id int) error {
 	if err != nil {
 		log.Print("failed send ping")
 		this.cancel()
+		return err
+	}
+
+	return nil
+}
+
+func (this *SlackConnector) sendTyping(channel string) error {
+	typing := &Typing{Id: 1, Type: "typing", Channel: channel}
+	buf, err := json.Marshal(typing)
+	if err != nil {
+		log.Print("faild json.Marshal")
+		return err
+	}
+
+	this.connection.SetWriteDeadline(time.Now().Add(WriteTimeout))
+	_, err = this.connection.Write(buf)
+	if err != nil {
 		return err
 	}
 
