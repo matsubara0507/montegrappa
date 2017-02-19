@@ -47,7 +47,7 @@ func (c *TestConnector) SendWithConfirm(_ *Event, _username string, text string)
 	return "", nil
 }
 
-func (c *TestConnector) WithIndicate(channel string, f func() error) context.CancelFunc {
+func (c *TestConnector) WithIndicate(channel string) context.CancelFunc {
 	_, cancel := context.WithCancel(context.Background())
 	return cancel
 }
