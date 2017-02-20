@@ -158,8 +158,12 @@ func (this *EventHandler) Handle(event *Event, async bool) {
 				continue
 			}
 			if event.EventId() == command.messageId && event.Reaction == command.reaction {
-				command.callback(event)
 				go this.RemoveRequireReaction(event.EventId(), event.Reaction)
+				if async {
+					go command.callback(event)
+				} else {
+					command.callback(event)
+				}
 			}
 		}
 	}
