@@ -1,18 +1,21 @@
 package slack
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/f110/montegrappa/bot"
-	"golang.org/x/net/websocket"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/f110/montegrappa/bot"
+	"golang.org/x/net/websocket"
 )
 
 type SlackConnector struct {
@@ -241,6 +244,59 @@ func (this *SlackConnector) SendWithConfirm(event *bot.Event, username, text str
 	}
 
 	return data.Ts, nil
+}
+
+func (this *SlackConnector) Attach(event *bot.Event, fileName string, file io.Reader, title string) error {
+	buf := bytes.NewBuffer([]byte{})
+	w := multipart.NewWriter(buf)
+	f, err := w.CreateFormField("token")
+	if err != nil {
+		return err
+	}
+	f.Write([]byte(this.token))
+	f, err = w.CreateFormField("channels")
+	if err != nil {
+		return err
+	}
+	f.Write([]byte(event.Channel))
+	f, err = w.CreateFormField("title")
+	if err != nil {
+		return err
+	}
+	f.Write([]byte(title))
+	f, err = w.CreateFormField("filetype")
+	if err != nil {
+		return err
+	}
+	f.Write([]byte("auto"))
+	f, err = w.CreateFormField("filename")
+	if err != nil {
+		return err
+	}
+	f.Write([]byte(fileName))
+	f, err = w.CreateFormField("file")
+	if err != nil {
+		return err
+	}
+	io.Copy(f, file)
+
+	req, err := http.NewRequest("POST", "https://slack.com/api/files.upload", buf)
+	if err != nil {
+		return err
+	}
+
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return errors.New("Failed file upload")
+	}
+
+	return nil
 }
 
 func (this *SlackConnector) WithIndicate(channel string) context.CancelFunc {

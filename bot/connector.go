@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 )
 
@@ -12,6 +13,7 @@ type Connector interface {
 	ReceivedEvent() chan *Event
 	Send(*Event, string, string) error
 	SendWithConfirm(*Event, string, string) (string, error)
+	Attach(*Event, string, io.Reader, string) error
 	WithIndicate(string) context.CancelFunc
 	Async() bool
 	Idle() chan bool
@@ -85,6 +87,10 @@ func (self *Event) Replyf(format string, a ...interface{}) {
 
 func (self *Event) WithIndicate(f func() error) {
 	self.Bot.WithIndicate(self.Channel, f)
+}
+
+func (self *Event) Attach(title, fileName string, file io.Reader) {
+	self.Bot.Attach(self, title, fileName, file)
 }
 
 type SendedMessage struct {

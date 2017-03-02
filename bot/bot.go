@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"regexp"
 )
@@ -100,6 +101,10 @@ func (self *Bot) WithIndicate(channel string, f func() error) {
 	cancel := self.Connector.WithIndicate(channel)
 	defer cancel()
 	f()
+}
+
+func (self *Bot) Attach(event *Event, title, fileName string, file io.Reader) {
+	self.Connector.Attach(event, fileName, file, title)
 }
 
 func (self *Bot) Hear(pattern string, callback func(*Event)) {
