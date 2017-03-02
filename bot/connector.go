@@ -89,8 +89,8 @@ func (self *Event) WithIndicate(f func() error) {
 	self.Bot.WithIndicate(self.Channel, f)
 }
 
-func (self *Event) Attach(title, fileName string, file io.Reader) {
-	self.Bot.Attach(self, title, fileName, file)
+func (self *Event) Attach(title, fileName string, file io.Reader) error {
+	return self.Bot.Attach(self, title, fileName, file)
 }
 
 type SendedMessage struct {

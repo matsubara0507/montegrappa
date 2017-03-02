@@ -103,8 +103,8 @@ func (self *Bot) WithIndicate(channel string, f func() error) {
 	f()
 }
 
-func (self *Bot) Attach(event *Event, title, fileName string, file io.Reader) {
-	self.Connector.Attach(event, fileName, file, title)
+func (self *Bot) Attach(event *Event, title, fileName string, file io.Reader) error {
+	return self.Connector.Attach(event, fileName, file, title)
 }
 
 func (self *Bot) Hear(pattern string, callback func(*Event)) {

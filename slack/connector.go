@@ -296,6 +296,16 @@ func (this *SlackConnector) Attach(event *bot.Event, fileName string, file io.Re
 		return errors.New("Failed file upload")
 	}
 
+	dec := json.NewDecoder(res.Body)
+	var data struct {
+		Ok    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	dec.Decode(&data)
+	if data.Ok == false {
+		return errors.New(data.Error)
+	}
+
 	return nil
 }
 
