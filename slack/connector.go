@@ -274,16 +274,18 @@ func (this *SlackConnector) Attach(event *bot.Event, fileName string, file io.Re
 		return err
 	}
 	f.Write([]byte(fileName))
-	f, err = w.CreateFormField("file")
+	f, err = w.CreateFormFile("file", fileName)
 	if err != nil {
 		return err
 	}
 	io.Copy(f, file)
+	w.Close()
 
 	req, err := http.NewRequest("POST", "https://slack.com/api/files.upload", buf)
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", w.FormDataContentType())
 
 	client := &http.Client{}
 	res, err := client.Do(req)
