@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"io"
 	"sync"
 )
 
@@ -45,6 +46,10 @@ func (c *TestConnector) SendWithConfirm(_ *Event, _username string, text string)
 	defer c.sync.Unlock()
 	c.SendMessages = append(c.SendMessages, text)
 	return "", nil
+}
+
+func (c *TestConnector) Attach(_ *Event, _file io.Reader, _filename string) error {
+	return nil
 }
 
 func (c *TestConnector) WithIndicate(channel string) context.CancelFunc {
