@@ -48,7 +48,7 @@ func (c *TestConnector) SendWithConfirm(_ *Event, _username string, text string)
 	return "", nil
 }
 
-func (c *TestConnector) Attach(_ *Event, _file io.Reader, _filename string) error {
+func (c *TestConnector) Attach(_ *Event, _fileName string, _file io.Reader, _title string) error {
 	return nil
 }
 
