@@ -15,6 +15,7 @@ type Connector interface {
 	SendWithConfirm(*Event, string, string) (string, error)
 	Attach(*Event, string, io.Reader, string) error
 	WithIndicate(string) context.CancelFunc
+	SendPrivate(*Event, string, string) error
 	Async() bool
 	Idle() chan bool
 	GetChannelInfo(string) (*ChannelInfo, error)
@@ -91,6 +92,14 @@ func (self *Event) WithIndicate(f func() error) {
 
 func (self *Event) Attach(title, fileName string, file io.Reader) error {
 	return self.Bot.Attach(self, title, fileName, file)
+}
+
+func (self *Event) Direct(text string) {
+	self.Bot.SendPrivate(self, text)
+}
+
+func (self *Event) Directf(format string, a ...interface{}) {
+	self.Bot.SendPrivate(self, fmt.Sprintf(format, a...))
 }
 
 type SendedMessage struct {

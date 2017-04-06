@@ -79,6 +79,18 @@ type ReactionAdded struct {
 	EventTs string `json:"event_ts"`
 }
 
+type ResponseIMOpen struct {
+	Ok      bool `json:"ok"`
+	Channel struct {
+		Id string `json:"id"`
+	} `json:"channel"`
+}
+
+type ResponsePostMessage struct {
+	Ok bool   `json:"ok"`
+	Ts string `json:"ts"`
+}
+
 var (
 	ReadBufferSize       = 512
 	ReadTimeout          = 1 * time.Minute
@@ -198,52 +210,44 @@ func (this *SlackConnector) Idle() chan bool {
 }
 
 func (this *SlackConnector) Send(event *bot.Event, username string, text string) error {
-	v := url.Values{}
-	v.Set("token", this.token)
-	v.Set("channel", event.Channel)
-	v.Set("text", text)
-	v.Set("as_user", "false")
-
-	response, err := http.PostForm("https://slack.com/api/chat.postMessage", v)
+	_, err := this.postMessage(event.Channel, text, "")
 	if err != nil {
 		return err
-	}
-	defer response.Body.Close()
-	dec := json.NewDecoder(response.Body)
-	var data struct {
-		Ok bool   `json:"ok"`
-		Ts string `json:"ts"`
-	}
-	dec.Decode(&data)
-
-	if data.Ok != true {
-		return ErrFailedPostMessage
 	}
 
 	return nil
 }
 
 func (this *SlackConnector) SendWithConfirm(event *bot.Event, username, text string) (string, error) {
+	res, err := this.postMessage(event.Channel, text, username)
+	if err != nil {
+		return "", err
+	}
+
+	return res.Ts, nil
+}
+
+func (this *SlackConnector) SendPrivate(event *bot.Event, userId, text string) error {
 	v := url.Values{}
 	v.Set("token", this.token)
-	v.Set("channel", event.Channel)
-	v.Set("text", text)
-	v.Set("as_user", "false")
-	v.Set("username", username)
+	v.Set("user", userId)
 
-	response, _ := http.PostForm("https://slack.com/api/chat.postMessage", v)
-	dec := json.NewDecoder(response.Body)
-	var data struct {
-		Ok bool   `json:"ok"`
-		Ts string `json:"ts"`
+	res, err := http.PostForm("https://slack.com/api/im.open", v)
+	if err != nil {
+		return err
 	}
-	dec.Decode(&data)
-
-	if data.Ok != true {
-		return "", ErrFailedPostMessage
+	defer res.Body.Close()
+	decoder := json.NewDecoder(res.Body)
+	var data ResponseIMOpen
+	decoder.Decode(&data)
+	if data.Ok == false {
+		return err
 	}
 
-	return data.Ts, nil
+	channelId := data.Channel.Id
+	_, err = this.postMessage(channelId, text, "")
+
+	return err
 }
 
 func (this *SlackConnector) Attach(event *bot.Event, fileName string, file io.Reader, title string) error {
@@ -420,4 +424,30 @@ func (this *SlackConnector) sendTyping(channel string) error {
 	}
 
 	return nil
+}
+
+func (this *SlackConnector) postMessage(channel, text, username string) (*ResponsePostMessage, error) {
+	v := url.Values{}
+	v.Set("token", this.token)
+	v.Set("channel", channel)
+	v.Set("text", text)
+	v.Set("as_user", "false")
+	if username != "" {
+		v.Set("username", username)
+	}
+
+	res, err := http.PostForm("https://slack.com/api/chat.postMessage", v)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	dec := json.NewDecoder(res.Body)
+	var data ResponsePostMessage
+	dec.Decode(&data)
+
+	if data.Ok != true {
+		return nil, ErrFailedPostMessage
+	}
+
+	return &data, nil
 }

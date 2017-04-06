@@ -107,6 +107,10 @@ func (self *Bot) Attach(event *Event, title, fileName string, file io.Reader) er
 	return self.Connector.Attach(event, fileName, file, title)
 }
 
+func (self *Bot) SendPrivate(event *Event, text string) {
+	self.Connector.SendPrivate(event, event.User.Id, text)
+}
+
 func (self *Bot) Hear(pattern string, callback func(*Event)) {
 	self.eventHandler.AddCommand(regexp.MustCompile(pattern), "", callback, false)
 }

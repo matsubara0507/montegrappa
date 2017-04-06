@@ -57,6 +57,10 @@ func (c *TestConnector) WithIndicate(channel string) context.CancelFunc {
 	return cancel
 }
 
+func (c *TestConnector) SendPrivate(event *Event, _userId string, text string) error {
+	return c.Send(event, "", text)
+}
+
 func (c *TestConnector) Async() bool {
 	return true
 }
