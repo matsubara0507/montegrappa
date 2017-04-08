@@ -3,9 +3,10 @@ package slack
 import (
 	"encoding/json"
 	"errors"
-	"github.com/f110/montegrappa/bot"
 	"net/http"
 	"net/url"
+
+	"github.com/f110/montegrappa/bot"
 )
 
 var (

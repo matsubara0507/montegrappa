@@ -103,6 +103,10 @@ func (self *Bot) SendPrivate(event *Event, text string) {
 	self.Connector.SendPrivate(event, event.User.Id, text)
 }
 
+func (self *Bot) GetPermalink(event *Event) string {
+	return self.Connector.GetPermalink(event)
+}
+
 func (self *Bot) Hear(pattern string, callback func(*Event)) {
 	self.eventHandler.AddCommand(regexp.MustCompile(pattern), "", callback, false)
 }

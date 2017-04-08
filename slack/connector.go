@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"mime/multipart"
@@ -25,6 +26,7 @@ type SlackConnector struct {
 	idle      chan bool
 
 	token      string
+	teamId     string
 	bufChan    chan []byte
 	startTime  int
 	connection *websocket.Conn
@@ -99,7 +101,7 @@ var (
 	ErrFailedPostMessage = errors.New("Failed chat.postMessage")
 )
 
-func NewSlackConnector(token string) *SlackConnector {
+func NewSlackConnector(teamId, token string) *SlackConnector {
 	startTime := int(time.Now().Unix())
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -332,6 +334,10 @@ func (this *SlackConnector) WithIndicate(channel string) context.CancelFunc {
 	}(channel)
 
 	return cancel
+}
+
+func (slackConnector *SlackConnector) GetPermalink(event *bot.Event) string {
+	return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", slackConnector.teamId, event.Channel, strings.Trim(event.Ts, "."))
 }
 
 func (this *SlackConnector) startReading() {
