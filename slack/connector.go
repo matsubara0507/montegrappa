@@ -27,6 +27,7 @@ type SlackConnector struct {
 
 	token      string
 	teamId     string
+	domain     string
 	bufChan    chan []byte
 	startTime  int
 	connection *websocket.Conn
@@ -337,7 +338,19 @@ func (this *SlackConnector) WithIndicate(channel string) context.CancelFunc {
 }
 
 func (slackConnector *SlackConnector) GetPermalink(event *bot.Event) string {
-	return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", slackConnector.teamId, event.Channel, strings.Trim(event.Ts, "."))
+	return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", slackConnector.teamDomain(), event.Channel, strings.Trim(event.Ts, "."))
+}
+
+func (slackConnector *SlackConnector) teamDomain() string {
+	if slackConnector.domain == "" {
+		info, err := slackConnector.GetTeamInfo()
+		if err != nil {
+			return ""
+		}
+		slackConnector.domain = info.Domain
+	}
+
+	return slackConnector.domain
 }
 
 func (this *SlackConnector) startReading() {
