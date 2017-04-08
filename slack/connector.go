@@ -338,7 +338,7 @@ func (this *SlackConnector) WithIndicate(channel string) context.CancelFunc {
 }
 
 func (slackConnector *SlackConnector) GetPermalink(event *bot.Event) string {
-	return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", slackConnector.teamDomain(), event.Channel, strings.Trim(event.Ts, "."))
+	return fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", slackConnector.teamDomain(), event.Channel, strings.Replace(event.Ts, ".", "", -1))
 }
 
 func (slackConnector *SlackConnector) teamDomain() string {
