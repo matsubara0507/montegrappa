@@ -14,16 +14,14 @@ var (
 type Bot struct {
 	Connector        Connector
 	Name             string
-	TeamID           string
 	connectErrorChan chan bool
 	eventHandler     *EventHandler
 }
 
-func NewBot(connector Connector, name, teamId string, ignoreUsers []string) *Bot {
+func NewBot(connector Connector, name string, ignoreUsers []string) *Bot {
 	bot := &Bot{
 		Connector:        connector,
 		Name:             name,
-		TeamID:           teamId,
 		connectErrorChan: make(chan bool),
 		eventHandler:     NewEventHandler(ignoreUsers),
 	}
