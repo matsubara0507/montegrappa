@@ -13,23 +13,15 @@ var (
 
 type Bot struct {
 	Connector        Connector
-	name             string
+	Name             string
 	connectErrorChan chan bool
 	eventHandler     *EventHandler
 }
 
-func BotInstance() *Bot {
-	return botInstance
-}
-
 func NewBot(connector Connector, name string, ignoreUsers []string) *Bot {
-	if botInstance != nil {
-		return botInstance
-	}
-
 	bot := &Bot{
 		Connector:        connector,
-		name:             name,
+		Name:             name,
 		connectErrorChan: make(chan bool),
 		eventHandler:     NewEventHandler(ignoreUsers),
 	}
@@ -69,7 +61,7 @@ func (self *Bot) Start() {
 }
 
 func (self *Bot) Send(event *Event, text string) {
-	self.Connector.Send(event, self.name, text)
+	self.Connector.Send(event, self.Name, text)
 }
 
 func (self *Bot) Sendf(event *Event, format string, a ...interface{}) {
@@ -78,7 +70,7 @@ func (self *Bot) Sendf(event *Event, format string, a ...interface{}) {
 }
 
 func (self *Bot) SendWithConfirm(event *Event, text, reaction string, callback func(*Event)) {
-	id, _ := self.Connector.SendWithConfirm(event, self.name, text)
+	id, _ := self.Connector.SendWithConfirm(event, self.Name, text)
 	self.eventHandler.RequireReaction(event.Channel, id, reaction, callback)
 }
 
@@ -88,7 +80,7 @@ func (self *Bot) SendWithConfirmf(event *Event, reaction string, callback func(*
 }
 
 func (self *Bot) SendRequireResponse(event *Event, text string) (func(), chan string) {
-	self.Connector.Send(event, self.name, text)
+	self.Connector.Send(event, self.Name, text)
 	return self.eventHandler.RequireResponse(event.Channel, event.User.Id)
 }
 
@@ -111,16 +103,20 @@ func (self *Bot) SendPrivate(event *Event, text string) {
 	self.Connector.SendPrivate(event, event.User.Id, text)
 }
 
+func (self *Bot) GetPermalink(event *Event) string {
+	return self.Connector.GetPermalink(event)
+}
+
 func (self *Bot) Hear(pattern string, callback func(*Event)) {
 	self.eventHandler.AddCommand(regexp.MustCompile(pattern), "", callback, false)
 }
 
 func (self *Bot) Command(pattern string, description string, callback func(*Event)) {
-	self.eventHandler.AddCommand(regexp.MustCompile("\\A"+self.name+"\\s+"+pattern+"\\z"), pattern+" - "+description, callback, false)
+	self.eventHandler.AddCommand(regexp.MustCompile("\\A"+self.Name+"\\s+"+pattern+"\\z"), pattern+" - "+description, callback, false)
 }
 
 func (self *Bot) CommandWithArgv(pattern string, description string, callback func(*Event)) {
-	self.eventHandler.AddCommand(regexp.MustCompile("\\A"+self.name+"\\s+"+pattern+"(?:\\s+(.+))*\\z"), pattern+" - "+description, callback, true)
+	self.eventHandler.AddCommand(regexp.MustCompile("\\A"+self.Name+"\\s+"+pattern+"(?:\\s+(.+))*\\z"), pattern+" - "+description, callback, true)
 }
 
 func (self *Bot) Appearance(user string, callback func(*Event)) {

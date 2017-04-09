@@ -19,6 +19,7 @@ type Connector interface {
 	Async() bool
 	Idle() chan bool
 	GetChannelInfo(string) (*ChannelInfo, error)
+	GetPermalink(*Event) string
 }
 
 const (
@@ -100,6 +101,10 @@ func (self *Event) Direct(text string) {
 
 func (self *Event) Directf(format string, a ...interface{}) {
 	self.Bot.SendPrivate(self, fmt.Sprintf(format, a...))
+}
+
+func (self *Event) Permalink() string {
+	return self.Bot.GetPermalink(self)
 }
 
 type SendedMessage struct {

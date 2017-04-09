@@ -68,3 +68,7 @@ func (c *TestConnector) Async() bool {
 func (c *TestConnector) Idle() chan bool {
 	return make(chan bool)
 }
+
+func (c *TestConnector) GetPermalink(_event *Event) string {
+	return "test-connector-permalink"
+}
