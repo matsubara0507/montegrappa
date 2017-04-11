@@ -190,7 +190,7 @@ func (this *SlackConnector) Listen() error {
 				}
 				botEvent.Channel = reactionAdded.Item.Channel
 				botEvent.Ts = reactionAdded.Item.Ts
-				botEvent.User.Id = reactionAdded.ItemUser
+				botEvent.User.Id = reactionAdded.User
 				botEvent.Reaction = reactionAdded.Reaction
 			default:
 				botEvent.Type = bot.UnknownEvent

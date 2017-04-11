@@ -64,7 +64,7 @@ func (self *Bot) Sendf(event *Event, format string, a ...interface{}) {
 
 func (self *Bot) SendWithConfirm(event *Event, text, reaction string, callback func(*Event)) {
 	id, _ := self.Connector.SendWithConfirm(event, self.Name, text)
-	self.eventHandler.RequireReaction(event.Channel, id, reaction, callback)
+	self.eventHandler.RequireReaction(event.Channel, id, reaction, event.User.Id, callback)
 }
 
 func (self *Bot) SendWithConfirmf(event *Event, reaction string, callback func(*Event), format string, a ...interface{}) {

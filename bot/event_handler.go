@@ -71,8 +71,8 @@ func (this *EventHandler) Appearance(user string, callback func(*Event)) {
 	this.AddHandler(UserTypingEvent, command)
 }
 
-func (this *EventHandler) RequireReaction(channel, id, reaction string, callback func(*Event)) {
-	c := &Command{messageId: channel + id, reaction: reaction, callback: callback, createdAt: time.Now()}
+func (this *EventHandler) RequireReaction(channel, id, reaction, userId string, callback func(*Event)) {
+	c := &Command{messageId: channel + id, reaction: reaction, user: userId, callback: callback, createdAt: time.Now()}
 	go this.AddHandler(ReactionAddedEvent, c)
 }
 
@@ -173,7 +173,7 @@ func (this *EventHandler) Handle(event *Event, async bool) {
 				go this.RemoveRequireReaction(command.messageId, command.reaction)
 				continue
 			}
-			if event.EventId() == command.messageId && event.Reaction == command.reaction {
+			if event.EventId() == command.messageId && event.User.Id == command.user && event.Reaction == command.reaction {
 				go this.RemoveRequireReaction(event.EventId(), event.Reaction)
 				if async {
 					go command.callback(event)
