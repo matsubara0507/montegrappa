@@ -8,6 +8,8 @@ import (
 )
 
 type EventHandler struct {
+	accept      bool
+	acceptUsers map[string]bool
 	ignoreUsers map[string]bool
 	commands    map[string][]Command
 	mutex       *sync.RWMutex
@@ -35,14 +37,25 @@ var (
 	ReactionExpire = 3 * time.Minute
 )
 
-func NewEventHandler(ignoreUsers []string) *EventHandler {
-	ignore := make(map[string]bool)
-	for _, v := range ignoreUsers {
-		ignore[v] = true
+func NewEventHandler(ignoreUsers []string, acceptUsers []string) *EventHandler {
+	accept := false
+	acceptMap := make(map[string]bool)
+	ignoreMap := make(map[string]bool)
+	if len(acceptUsers) > 0 {
+		accept = true
+		for _, v := range acceptUsers {
+			acceptMap[v] = true
+		}
+	} else {
+		for _, v := range ignoreUsers {
+			ignoreMap[v] = true
+		}
 	}
 
 	return &EventHandler{
-		ignoreUsers: ignore,
+		accept:      accept,
+		acceptUsers: acceptMap,
+		ignoreUsers: ignoreMap,
 		commands:    make(map[string][]Command, 0),
 		mutex:       &sync.RWMutex{},
 	}
@@ -114,6 +127,9 @@ func (this *EventHandler) AddHandler(eventType string, command *Command) {
 }
 
 func (this *EventHandler) Handle(event *Event, async bool) {
+	if _, ok := this.acceptUsers[event.User.Id]; this.accept && ok == false {
+		return
+	}
 	if _, ok := this.ignoreUsers[event.User.Id]; ok == true {
 		return
 	}

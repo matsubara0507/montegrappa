@@ -7,10 +7,6 @@ import (
 	"regexp"
 )
 
-var (
-	botInstance *Bot
-)
-
 type Bot struct {
 	Connector        Connector
 	Name             string
@@ -18,16 +14,13 @@ type Bot struct {
 	eventHandler     *EventHandler
 }
 
-func NewBot(connector Connector, name string, ignoreUsers []string) *Bot {
-	bot := &Bot{
+func NewBot(connector Connector, name string, ignoreUsers []string, acceptUsers []string) *Bot {
+	return &Bot{
 		Connector:        connector,
 		Name:             name,
 		connectErrorChan: make(chan bool),
-		eventHandler:     NewEventHandler(ignoreUsers),
+		eventHandler:     NewEventHandler(ignoreUsers, acceptUsers),
 	}
-	botInstance = bot
-
-	return bot
 }
 
 func (self *Bot) Connect() {
