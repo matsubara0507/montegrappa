@@ -25,6 +25,12 @@ type TeamInfo struct {
 	Domain string `json:"domain"`
 }
 
+type User struct {
+	Id       string `json:"id"`
+	Name     string `json:"name"`
+	RealName string `json:"real_name"`
+}
+
 type UserInfoResponse struct {
 	Ok   bool     `json:"ok"`
 	User UserInfo `json:"user"`
@@ -38,6 +44,11 @@ type ChannelInfoResponse struct {
 type TeamInfoResponse struct {
 	Ok   bool     `json:"ok"`
 	Team TeamInfo `json:"team"`
+}
+
+type UserListResponse struct {
+	Ok      bool   `json:"ok"`
+	Members []User `json:"members"`
 }
 
 func (slackConnector *SlackConnector) GetUserInfo(userId string) (*UserInfo, error) {
@@ -101,4 +112,25 @@ func (slackConnector *SlackConnector) GetTeamInfo() (*TeamInfo, error) {
 	}
 
 	return &resObj.Team, nil
+}
+
+func (slackConnector *SlackConnector) GetUserList() ([]User, error) {
+	v := url.Values{}
+	v.Set("token", slackConnector.token)
+	v.Set("presence", "false")
+	res, err := http.PostForm("https://slack.com/api/users.list", v)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	d := json.NewDecoder(res.Body)
+	resObj := new(UserListResponse)
+	d.Decode(resObj)
+
+	if resObj.Ok == false {
+		return nil, errors.New("can not get users.list")
+	}
+
+	return resObj.Members, nil
 }
