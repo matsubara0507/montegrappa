@@ -1,19 +1,22 @@
 package main
 
 import (
-	"github.com/f110/montegrappa/bot"
-	"github.com/f110/montegrappa/slack"
 	"os"
 	"time"
+
+	"github.com/f110/montegrappa/bot"
+	"github.com/f110/montegrappa/slack"
 )
 
 func main() {
 	Token := os.Getenv("SLACK_TOKEN")
 	BotName := "debug"
+	Team := "debug"
 	IgnoreUsers := make([]string, 0)
+	AcceptUsers := make([]string, 0)
 
-	connector := slack.NewSlackConnector(Token)
-	robot := bot.NewBot(connector, BotName, IgnoreUsers)
+	connector := slack.NewSlackConnector(Team, Token)
+	robot := bot.NewBot(connector, BotName, IgnoreUsers, AcceptUsers)
 	robot.Command("ping", "ping pong", func(msg *bot.Event) {
 		msg.Sayf("pong %l", msg.User)
 	})
