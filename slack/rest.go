@@ -12,8 +12,11 @@ import (
 )
 
 var (
-	ErrUserNotFound    = errors.New("user not found")
-	ErrChannelNotFound = errors.New("channel not found")
+	ErrUserNotFound             = errors.New("user not found")
+	ErrChannelNotFound          = errors.New("channel not found")
+	ErrFailedPostMessage        = errors.New("Failed post message")
+	ErrFailedGetRTMEndpoint     = errors.New("Failed getting RTM Endpoind")
+	ErrFailedOpenPrivateChannel = errors.New("Failed open private channel")
 )
 
 type UserInfo struct {
@@ -31,6 +34,10 @@ type User struct {
 	Id       string `json:"id"`
 	Name     string `json:"name"`
 	RealName string `json:"real_name"`
+}
+
+type Channel struct {
+	Id string `json:"id"`
 }
 
 type UserInfoResponse struct {
@@ -51,6 +58,50 @@ type TeamInfoResponse struct {
 type UserListResponse struct {
 	Ok      bool   `json:"ok"`
 	Members []User `json:"members"`
+}
+
+type PostMesssageResponse struct {
+	Ok bool   `json:"ok"`
+	Ts string `json:"ts"`
+}
+
+type RTMConnectResponse struct {
+	Ok  bool   `json:"ok"`
+	URL string `json:"url"`
+}
+
+type IMOpenResponse struct {
+	Ok      bool    `json:"ok"`
+	Channel Channel `json:"channel"`
+}
+
+func (slackConnector *SlackConnector) PostMessage(channel, text, username string) (*PostMesssageResponse, error) {
+	v := url.Values{}
+	v.Set("channel", channel)
+	v.Set("text", text)
+	v.Set("as_user", "false")
+	if username != "" {
+		v.Set("username", username)
+	}
+
+	res, err := slackConnector.callRestAPI(context.Background(), "chat.postMessage", v)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	d := json.NewDecoder(res.Body)
+	var resObj PostMesssageResponse
+	err = d.Decode(&resObj)
+	if err != nil {
+		return nil, err
+	}
+
+	if resObj.Ok == false {
+		return nil, ErrFailedPostMessage
+	}
+
+	return &resObj, nil
 }
 
 func (slackConnector *SlackConnector) GetUserInfo(userId string) (*UserInfo, error) {
@@ -141,6 +192,50 @@ func (slackConnector *SlackConnector) GetUserList() ([]User, error) {
 	}
 
 	return resObj.Members, nil
+}
+
+func (slackConnector *SlackConnector) RTMConnect() (string, error) {
+	res, err := slackConnector.callRestAPI(context.Background(), "rtm.connect", url.Values{})
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+
+	d := json.NewDecoder(res.Body)
+	var resObj RTMConnectResponse
+	err = d.Decode(&resObj)
+	if err != nil {
+		return "", err
+	}
+
+	if resObj.Ok == false {
+		return "", ErrFailedGetRTMEndpoint
+	}
+
+	return resObj.URL, nil
+}
+
+func (slackConnector *SlackConnector) IMOpen(userId string) (*Channel, error) {
+	v := url.Values{}
+	v.Set("user", userId)
+	res, err := slackConnector.callRestAPI(context.Background(), "im.open", v)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	d := json.NewDecoder(res.Body)
+	var resObj IMOpenResponse
+	err = d.Decode(&resObj)
+	if err != nil {
+		return nil, err
+	}
+
+	if resObj.Ok == false {
+		return nil, ErrFailedOpenPrivateChannel
+	}
+
+	return &resObj.Channel, nil
 }
 
 func (slackConnector *SlackConnector) callRestAPI(ctx context.Context, method string, v url.Values) (*http.Response, error) {

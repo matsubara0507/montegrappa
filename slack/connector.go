@@ -10,25 +10,33 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/f110/montegrappa/bot"
 	"golang.org/x/net/websocket"
 )
 
+var (
+	ReadBufferSize    = 512
+	ReadTimeout       = 1 * time.Minute
+	WriteTimeout      = 1 * time.Minute
+	HeartbeatInterval = 30 * time.Second
+)
+
 type SlackConnector struct {
-	ctx       context.Context
-	cancel    context.CancelFunc
-	eventChan chan *bot.Event
-	idle      chan bool
+	mutex          *sync.Mutex
+	disconnectConn bool
+	eventChan      chan *bot.Event
+	idle           chan bool
 
 	token      string
 	teamId     string
 	domain     string
 	bufChan    chan []byte
+	errorChan  chan error
 	startTime  int
 	connection *websocket.Conn
 }
@@ -82,73 +90,51 @@ type ReactionAdded struct {
 	EventTs string `json:"event_ts"`
 }
 
-type ResponseIMOpen struct {
-	Ok      bool `json:"ok"`
-	Channel struct {
-		Id string `json:"id"`
-	} `json:"channel"`
-}
-
-type ResponsePostMessage struct {
-	Ok bool   `json:"ok"`
-	Ts string `json:"ts"`
-}
-
-var (
-	ReadBufferSize       = 512
-	ReadTimeout          = 1 * time.Minute
-	WriteTimeout         = 1 * time.Minute
-	HeartbeatInterval    = 30 * time.Second
-	ErrFailedPostMessage = errors.New("Failed chat.postMessage")
-)
-
 func NewSlackConnector(teamId, token string) *SlackConnector {
 	startTime := int(time.Now().Unix())
-	ctx, cancel := context.WithCancel(context.Background())
 
 	return &SlackConnector{
-		ctx:       ctx,
-		cancel:    cancel,
 		token:     token,
 		startTime: startTime,
 		eventChan: make(chan *bot.Event),
+		errorChan: make(chan error),
+		mutex:     &sync.Mutex{},
 	}
 }
 
-func (this *SlackConnector) Connect() {
-	v := url.Values{}
-	v.Set("token", this.token)
-	response, _ := http.PostForm("https://slack.com/api/rtm.start", v)
-	dec := json.NewDecoder(response.Body)
-	var data struct {
-		URL string `json:"url"`
-	}
-	dec.Decode(&data)
-	log.Print("start connect to ", data.URL)
-	ws, err := websocket.Dial(data.URL, "", "http://localhost")
+func (slackConnector *SlackConnector) Connect() error {
+	url, err := slackConnector.RTMConnect()
 	if err != nil {
-		log.Print(err)
+		return err
+	}
+	log.Printf("start connect to %s", url)
+	ws, err := websocket.Dial(url, "", "http://localhost")
+	if err != nil {
+		return err
 	}
 
-	this.connection = ws
-	this.startReading()
+	slackConnector.disconnectConn = false
+	slackConnector.connection = ws
+	slackConnector.startReading()
+
+	return nil
 }
 
-func (this *SlackConnector) Async() bool {
+func (*SlackConnector) Async() bool {
 	return true
 }
 
-func (this *SlackConnector) Listen() error {
+func (slackConnector *SlackConnector) Listen() error {
 	for {
 		select {
-		case buf := <-this.bufChan:
+		case buf := <-slackConnector.bufChan:
 			var event Event
 			json.Unmarshal(buf, &event)
 
 			if event.Ts != "" {
 				ts := strings.Split(event.Ts, ".")[0]
 				i, _ := strconv.Atoi(ts)
-				if i < this.startTime {
+				if i < slackConnector.startTime {
 					log.Print("skip event")
 					continue
 				}
@@ -179,7 +165,6 @@ func (this *SlackConnector) Listen() error {
 				botEvent.Channel = userTypingEvent.Channel
 				botEvent.User.Id = userTypingEvent.User
 			case "pong":
-				log.Print("receive pong")
 				continue
 			case "reaction_added":
 				botEvent.Type = bot.ReactionAddedEvent
@@ -196,24 +181,24 @@ func (this *SlackConnector) Listen() error {
 				botEvent.Type = bot.UnknownEvent
 			}
 
-			this.eventChan <- botEvent
-		case <-this.ctx.Done():
+			slackConnector.eventChan <- botEvent
+		case <-slackConnector.errorChan:
 			log.Print("disconnect server")
 			return errors.New("disconnect")
 		}
 	}
 }
 
-func (this *SlackConnector) ReceivedEvent() chan *bot.Event {
-	return this.eventChan
+func (slackConnector *SlackConnector) ReceivedEvent() chan *bot.Event {
+	return slackConnector.eventChan
 }
 
-func (this *SlackConnector) Idle() chan bool {
-	return this.idle
+func (slackConnector *SlackConnector) Idle() chan bool {
+	return slackConnector.idle
 }
 
-func (this *SlackConnector) Send(event *bot.Event, username string, text string) error {
-	_, err := this.postMessage(event.Channel, text, "")
+func (slackConnector *SlackConnector) Send(event *bot.Event, username string, text string) error {
+	_, err := slackConnector.PostMessage(event.Channel, text, "")
 	if err != nil {
 		return err
 	}
@@ -221,8 +206,8 @@ func (this *SlackConnector) Send(event *bot.Event, username string, text string)
 	return nil
 }
 
-func (this *SlackConnector) SendWithConfirm(event *bot.Event, username, text string) (string, error) {
-	res, err := this.postMessage(event.Channel, text, username)
+func (slackConnector *SlackConnector) SendWithConfirm(event *bot.Event, username, text string) (string, error) {
+	res, err := slackConnector.PostMessage(event.Channel, text, username)
 	if err != nil {
 		return "", err
 	}
@@ -230,37 +215,24 @@ func (this *SlackConnector) SendWithConfirm(event *bot.Event, username, text str
 	return res.Ts, nil
 }
 
-func (this *SlackConnector) SendPrivate(event *bot.Event, userId, text string) error {
-	v := url.Values{}
-	v.Set("token", this.token)
-	v.Set("user", userId)
-
-	res, err := http.PostForm("https://slack.com/api/im.open", v)
+func (slackConnector *SlackConnector) SendPrivate(event *bot.Event, userId, text string) error {
+	channel, err := slackConnector.IMOpen(userId)
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
-	decoder := json.NewDecoder(res.Body)
-	var data ResponseIMOpen
-	decoder.Decode(&data)
-	if data.Ok == false {
-		return err
-	}
 
-	channelId := data.Channel.Id
-	_, err = this.postMessage(channelId, text, "")
-
+	_, err = slackConnector.PostMessage(channel.Id, text, "")
 	return err
 }
 
-func (this *SlackConnector) Attach(event *bot.Event, fileName string, file io.Reader, title string) error {
+func (slackConnector *SlackConnector) Attach(event *bot.Event, fileName string, file io.Reader, title string) error {
 	buf := bytes.NewBuffer([]byte{})
 	w := multipart.NewWriter(buf)
 	f, err := w.CreateFormField("token")
 	if err != nil {
 		return err
 	}
-	f.Write([]byte(this.token))
+	f.Write([]byte(slackConnector.token))
 	f, err = w.CreateFormField("channels")
 	if err != nil {
 		return err
@@ -318,8 +290,8 @@ func (this *SlackConnector) Attach(event *bot.Event, fileName string, file io.Re
 	return nil
 }
 
-func (this *SlackConnector) WithIndicate(channel string) context.CancelFunc {
-	ctx, cancel := context.WithCancel(this.ctx)
+func (slackConnector *SlackConnector) WithIndicate(channel string) context.CancelFunc {
+	ctx, cancel := context.WithCancel(context.Background())
 
 	go func(c string) {
 		t := time.Tick(2 * time.Second)
@@ -329,7 +301,7 @@ func (this *SlackConnector) WithIndicate(channel string) context.CancelFunc {
 			case <-ctx.Done():
 				break LOOP
 			case <-t:
-				this.sendTyping(c)
+				slackConnector.sendTyping(c)
 			}
 		}
 	}(channel)
@@ -353,23 +325,21 @@ func (slackConnector *SlackConnector) teamDomain() string {
 	return slackConnector.domain
 }
 
-func (this *SlackConnector) startReading() {
+func (slackConnector *SlackConnector) startReading() {
 	log.Print("start reading")
 	var msg []byte
-	this.bufChan = make(chan []byte)
+	slackConnector.bufChan = make(chan []byte)
 
 	go func() {
-	READ:
+		tmp := make([]byte, ReadBufferSize)
 		for {
-			var tmp = make([]byte, ReadBufferSize)
-			this.connection.SetReadDeadline(time.Now().Add(ReadTimeout))
-			n, err := this.connection.Read(tmp)
+			slackConnector.connection.SetReadDeadline(time.Now().Add(ReadTimeout))
+			n, err := slackConnector.connection.Read(tmp)
 			if err == io.EOF {
-				this.cancel()
-				break READ
+				break
 			}
 			if err != nil {
-				log.Fatal(err)
+				break
 			}
 			if msg != nil {
 				msg = append(msg, tmp[:n]...)
@@ -377,58 +347,62 @@ func (this *SlackConnector) startReading() {
 				msg = tmp[:n]
 			}
 			if n != ReadBufferSize {
-				this.bufChan <- msg
+				slackConnector.bufChan <- msg
 				msg = nil
 			}
 		}
+		slackConnector.disconnectConnection()
 	}()
 
 	go func() {
 		time.Sleep(10 * time.Second)
-		this.heartbeat()
+		slackConnector.heartbeat()
+		slackConnector.disconnectConnection()
 	}()
 }
 
-func (this *SlackConnector) heartbeat() {
-	id := 0
-	c := time.Tick(HeartbeatInterval)
-HEARTBEAT:
-	for {
-		var ret error
-		select {
-		case <-this.ctx.Done():
-			break HEARTBEAT
-		case <-c:
-			ret = this.sendPing(id)
-		}
+func (slackConnector *SlackConnector) disconnectConnection() {
+	slackConnector.mutex.Lock()
+	defer slackConnector.mutex.Unlock()
 
-		if ret != nil {
+	if slackConnector.disconnectConn == false {
+		slackConnector.disconnectConn = true
+		slackConnector.errorChan <- errors.New("disconnecting")
+	}
+}
+
+func (slackConnector *SlackConnector) heartbeat() {
+	id := 0
+	for {
+		err := slackConnector.sendPing(id)
+		if err != nil {
 			break
 		}
 
 		id++
+		time.Sleep(HeartbeatInterval)
 	}
 }
 
-func (this *SlackConnector) sendPing(id int) error {
+func (slackConnector *SlackConnector) sendPing(id int) error {
 	ping := &Ping{Id: id, Type: "ping", Time: int(time.Now().Unix())}
 	buf, err := json.Marshal(ping)
 	if err != nil {
 		log.Print("failed json.Marshal")
+		return err
 	}
-	log.Print("send ping to slack")
-	this.connection.SetWriteDeadline(time.Now().Add(WriteTimeout))
-	_, err = this.connection.Write(buf)
+
+	slackConnector.connection.SetWriteDeadline(time.Now().Add(WriteTimeout))
+	_, err = slackConnector.connection.Write(buf)
 	if err != nil {
 		log.Print("failed send ping")
-		this.cancel()
 		return err
 	}
 
 	return nil
 }
 
-func (this *SlackConnector) sendTyping(channel string) error {
+func (slackConnector *SlackConnector) sendTyping(channel string) error {
 	typing := &Typing{Id: 1, Type: "typing", Channel: channel}
 	buf, err := json.Marshal(typing)
 	if err != nil {
@@ -436,37 +410,11 @@ func (this *SlackConnector) sendTyping(channel string) error {
 		return err
 	}
 
-	this.connection.SetWriteDeadline(time.Now().Add(WriteTimeout))
-	_, err = this.connection.Write(buf)
+	slackConnector.connection.SetWriteDeadline(time.Now().Add(WriteTimeout))
+	_, err = slackConnector.connection.Write(buf)
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func (this *SlackConnector) postMessage(channel, text, username string) (*ResponsePostMessage, error) {
-	v := url.Values{}
-	v.Set("token", this.token)
-	v.Set("channel", channel)
-	v.Set("text", text)
-	v.Set("as_user", "false")
-	if username != "" {
-		v.Set("username", username)
-	}
-
-	res, err := http.PostForm("https://slack.com/api/chat.postMessage", v)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	dec := json.NewDecoder(res.Body)
-	var data ResponsePostMessage
-	dec.Decode(&data)
-
-	if data.Ok != true {
-		return nil, ErrFailedPostMessage
-	}
-
-	return &data, nil
 }

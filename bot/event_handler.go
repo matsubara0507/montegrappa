@@ -61,82 +61,82 @@ func NewEventHandler(ignoreUsers []string, acceptUsers []string) *EventHandler {
 	}
 }
 
-func (this *EventHandler) AddCommand(pattern *regexp.Regexp, description string, callback func(*Event), argv bool) {
+func (eventHandler *EventHandler) AddCommand(pattern *regexp.Regexp, description string, callback func(*Event), argv bool) {
 	command := &Command{pattern: pattern, description: description, callback: callback, argv: argv}
-	this.AddHandler(MessageEvent, command)
+	eventHandler.AddHandler(MessageEvent, command)
 }
 
-func (this *EventHandler) Appearance(user string, callback func(*Event)) {
+func (eventHandler *EventHandler) Appearance(user string, callback func(*Event)) {
 	command := &Command{user: user, callback: callback}
-	this.AddHandler(UserTypingEvent, command)
+	eventHandler.AddHandler(UserTypingEvent, command)
 }
 
-func (this *EventHandler) RequireReaction(channel, id, reaction, userId string, callback func(*Event)) {
+func (eventHandler *EventHandler) RequireReaction(channel, id, reaction, userId string, callback func(*Event)) {
 	c := &Command{messageId: channel + id, reaction: reaction, user: userId, callback: callback, createdAt: time.Now()}
-	go this.AddHandler(ReactionAddedEvent, c)
+	go eventHandler.AddHandler(ReactionAddedEvent, c)
 }
 
-func (this *EventHandler) RemoveRequireReaction(eventId, reaction string) {
-	this.mutex.Lock()
-	defer this.mutex.Unlock()
+func (eventHandler *EventHandler) RemoveRequireReaction(eventId, reaction string) {
+	eventHandler.mutex.Lock()
+	defer eventHandler.mutex.Unlock()
 	newCommands := make([]Command, 0)
-	for _, c := range this.commands[ReactionAddedEvent] {
+	for _, c := range eventHandler.commands[ReactionAddedEvent] {
 		if c.messageId == eventId && c.reaction == reaction {
 			continue
 		}
 		newCommands = append(newCommands, c)
 	}
-	this.commands[ReactionAddedEvent] = newCommands
+	eventHandler.commands[ReactionAddedEvent] = newCommands
 }
 
-func (this *EventHandler) RequireResponse(channel, user string) (func(), chan string) {
+func (eventHandler *EventHandler) RequireResponse(channel, user string) (func(), chan string) {
 	resChan := make(chan string)
 	callback := func(msg *Event) {
 		resChan <- msg.Message
 	}
 	cancelFunc := func() {
-		go this.RemoveRequireResponse(channel, user)
+		go eventHandler.RemoveRequireResponse(channel, user)
 	}
 	c := &Command{CommandType: CommandTypeRequireResponse, channel: channel, user: user, callback: callback}
-	go this.AddHandler(MessageEvent, c)
+	go eventHandler.AddHandler(MessageEvent, c)
 	return cancelFunc, resChan
 }
 
-func (this *EventHandler) RemoveRequireResponse(channel, user string) {
-	this.mutex.Lock()
-	defer this.mutex.Unlock()
+func (eventHandler *EventHandler) RemoveRequireResponse(channel, user string) {
+	eventHandler.mutex.Lock()
+	defer eventHandler.mutex.Unlock()
 
 	newCommands := make([]Command, 0)
-	for _, c := range this.commands[MessageEvent] {
+	for _, c := range eventHandler.commands[MessageEvent] {
 		if c.CommandType == CommandTypeRequireResponse && c.channel == channel && c.user == user {
 			continue
 		}
 		newCommands = append(newCommands, c)
 	}
-	this.commands[MessageEvent] = newCommands
+	eventHandler.commands[MessageEvent] = newCommands
 }
 
-func (this *EventHandler) AddHandler(eventType string, command *Command) {
-	this.mutex.Lock()
-	defer this.mutex.Unlock()
-	if this.commands[eventType] == nil {
-		this.commands[eventType] = make([]Command, 0)
+func (eventHandler *EventHandler) AddHandler(eventType string, command *Command) {
+	eventHandler.mutex.Lock()
+	defer eventHandler.mutex.Unlock()
+	if eventHandler.commands[eventType] == nil {
+		eventHandler.commands[eventType] = make([]Command, 0)
 	}
 
-	this.commands[eventType] = append(this.commands[eventType], *command)
+	eventHandler.commands[eventType] = append(eventHandler.commands[eventType], *command)
 }
 
-func (this *EventHandler) Handle(event *Event, async bool) {
-	if _, ok := this.acceptUsers[event.User.Id]; this.accept && ok == false {
+func (eventHandler *EventHandler) Handle(event *Event, async bool) {
+	if _, ok := eventHandler.acceptUsers[event.User.Id]; eventHandler.accept && ok == false {
 		return
 	}
-	if _, ok := this.ignoreUsers[event.User.Id]; ok == true {
+	if _, ok := eventHandler.ignoreUsers[event.User.Id]; ok == true {
 		return
 	}
 
-	this.mutex.RLock()
-	defer this.mutex.RUnlock()
-	for _, command := range this.commands[event.Type] {
+	eventHandler.mutex.RLock()
+	defer eventHandler.mutex.RUnlock()
+	for _, command := range eventHandler.commands[event.Type] {
 		switch event.Type {
 		case MessageEvent:
 			if command.CommandType == CommandTypeRequireResponse && event.Channel == command.channel && event.User.Id == command.user {
@@ -170,11 +170,11 @@ func (this *EventHandler) Handle(event *Event, async bool) {
 			}
 		case ReactionAddedEvent:
 			if time.Now().Sub(command.createdAt) >= ReactionExpire {
-				go this.RemoveRequireReaction(command.messageId, command.reaction)
+				go eventHandler.RemoveRequireReaction(command.messageId, command.reaction)
 				continue
 			}
 			if event.EventId() == command.messageId && event.User.Id == command.user && event.Reaction == command.reaction {
-				go this.RemoveRequireReaction(event.EventId(), event.Reaction)
+				go eventHandler.RemoveRequireReaction(event.EventId(), event.Reaction)
 				if async {
 					go command.callback(event)
 				} else {

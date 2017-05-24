@@ -5,113 +5,156 @@ import (
 	"io"
 	"log"
 	"regexp"
+	"time"
+
+	"github.com/pkg/errors"
+)
+
+const (
+	defaultConnectBackoffTime = 5 // seconds
+	maxConnectRetryCount      = 10
+)
+
+var (
+	ErrFailedConnect = errors.New("Failed connect")
 )
 
 type Bot struct {
-	Connector        Connector
-	Name             string
-	connectErrorChan chan bool
-	eventHandler     *EventHandler
+	Connector         Connector
+	Name              string
+	connectErrorChan  chan error
+	eventHandler      *EventHandler
+	connectRetryCount int
+	disconnectCount   int
 }
 
 func NewBot(connector Connector, name string, ignoreUsers []string, acceptUsers []string) *Bot {
 	return &Bot{
-		Connector:        connector,
-		Name:             name,
-		connectErrorChan: make(chan bool),
-		eventHandler:     NewEventHandler(ignoreUsers, acceptUsers),
+		Connector:         connector,
+		Name:              name,
+		connectErrorChan:  make(chan error),
+		eventHandler:      NewEventHandler(ignoreUsers, acceptUsers),
+		connectRetryCount: 0,
+		disconnectCount:   0,
 	}
 }
 
-func (self *Bot) Connect() {
-	self.Connector.Connect()
+func (bot *Bot) Start() error {
+	for {
+		for {
+			err := bot.Connect()
+			if err != nil {
+				bot.connectRetryCount += 1
+				sleepTime := time.Duration(bot.connectRetryCount*defaultConnectBackoffTime) * time.Second
+				time.Sleep(sleepTime)
+				continue
+			} else {
+				bot.connectRetryCount = 0
+				break
+			}
+
+			if bot.connectRetryCount > maxConnectRetryCount {
+				return ErrFailedConnect
+			}
+		}
+
+	RECEIVE:
+		for {
+			select {
+			case event := <-bot.Connector.ReceivedEvent():
+				event.Bot = bot
+				if bot.Connector.Async() == true {
+					go bot.eventHandler.Handle(event, true)
+				} else {
+					bot.eventHandler.Handle(event, false)
+					bot.Connector.Idle() <- true
+				}
+			case err := <-bot.connectErrorChan:
+				bot.disconnectCount++
+				log.Printf("reconnect: %s", err)
+				break RECEIVE
+			}
+		}
+	}
+
+	return nil
+}
+
+func (bot *Bot) Connect() error {
+	err := bot.Connector.Connect()
+	if err != nil {
+		return err
+	}
 
 	go func() {
-		res := self.Connector.Listen()
-		if res != nil {
-			self.connectErrorChan <- true
+		err := bot.Connector.Listen()
+		if err != nil {
+			bot.connectErrorChan <- err
 		}
 	}()
+
+	return nil
 }
 
-func (self *Bot) Start() {
-	self.Connect()
-	for {
-		select {
-		case event := <-self.Connector.ReceivedEvent():
-			event.Bot = self
-			if self.Connector.Async() == true {
-				go self.eventHandler.Handle(event, true)
-			} else {
-				self.eventHandler.Handle(event, false)
-				self.Connector.Idle() <- true
-			}
-		case <-self.connectErrorChan:
-			log.Print("reconnect")
-			self.Connect()
-		}
-	}
+func (bot *Bot) Send(event *Event, text string) {
+	bot.Connector.Send(event, bot.Name, text)
 }
 
-func (self *Bot) Send(event *Event, text string) {
-	self.Connector.Send(event, self.Name, text)
-}
-
-func (self *Bot) Sendf(event *Event, format string, a ...interface{}) {
+func (bot *Bot) Sendf(event *Event, format string, a ...interface{}) {
 	text := fmt.Sprintf(format, a...)
-	self.Send(event, text)
+	bot.Send(event, text)
 }
 
-func (self *Bot) SendWithConfirm(event *Event, text, reaction string, callback func(*Event)) {
-	id, _ := self.Connector.SendWithConfirm(event, self.Name, text)
-	self.eventHandler.RequireReaction(event.Channel, id, reaction, event.User.Id, callback)
+func (bot *Bot) SendWithConfirm(event *Event, text, reaction string, callback func(*Event)) {
+	id, _ := bot.Connector.SendWithConfirm(event, bot.Name, text)
+	bot.eventHandler.RequireReaction(event.Channel, id, reaction, event.User.Id, callback)
 }
 
-func (self *Bot) SendWithConfirmf(event *Event, reaction string, callback func(*Event), format string, a ...interface{}) {
+func (bot *Bot) SendWithConfirmf(event *Event, reaction string, callback func(*Event), format string, a ...interface{}) {
 	text := fmt.Sprintf(format, a)
-	self.SendWithConfirm(event, text, reaction, callback)
+	bot.SendWithConfirm(event, text, reaction, callback)
 }
 
-func (self *Bot) SendRequireResponse(event *Event, text string) (func(), chan string) {
-	self.Connector.Send(event, self.Name, text)
-	return self.eventHandler.RequireResponse(event.Channel, event.User.Id)
+func (bot *Bot) SendRequireResponse(event *Event, text string) (func(), chan string) {
+	bot.Connector.Send(event, bot.Name, text)
+	return bot.eventHandler.RequireResponse(event.Channel, event.User.Id)
 }
 
-func (self *Bot) SendRequireResponsef(event *Event, format string, a ...interface{}) (func(), chan string) {
+func (bot *Bot) SendRequireResponsef(event *Event, format string, a ...interface{}) (func(), chan string) {
 	text := fmt.Sprintf(format, a)
-	return self.SendRequireResponse(event, text)
+	return bot.SendRequireResponse(event, text)
 }
 
-func (self *Bot) WithIndicate(channel string, f func() error) {
-	cancel := self.Connector.WithIndicate(channel)
+func (bot *Bot) WithIndicate(channel string, f func() error) {
+	cancel := bot.Connector.WithIndicate(channel)
 	defer cancel()
 	f()
 }
 
-func (self *Bot) Attach(event *Event, title, fileName string, file io.Reader) error {
-	return self.Connector.Attach(event, fileName, file, title)
+func (bot *Bot) Attach(event *Event, title, fileName string, file io.Reader) error {
+	return bot.Connector.Attach(event, fileName, file, title)
 }
 
-func (self *Bot) SendPrivate(event *Event, text string) {
-	self.Connector.SendPrivate(event, event.User.Id, text)
+func (bot *Bot) SendPrivate(event *Event, text string) {
+	bot.Connector.SendPrivate(event, event.User.Id, text)
 }
 
-func (self *Bot) GetPermalink(event *Event) string {
-	return self.Connector.GetPermalink(event)
+func (bot *Bot) GetPermalink(event *Event) string {
+	return bot.Connector.GetPermalink(event)
 }
 
-func (self *Bot) Hear(pattern string, callback func(*Event)) {
-	self.eventHandler.AddCommand(regexp.MustCompile(pattern), "", callback, false)
+func (bot *Bot) Hear(pattern string, callback func(*Event)) {
+	bot.eventHandler.AddCommand(regexp.MustCompile(pattern), "", callback, false)
 }
 
-func (self *Bot) Command(pattern string, description string, callback func(*Event)) {
-	self.eventHandler.AddCommand(regexp.MustCompile("\\A"+self.Name+"\\s+"+pattern+"\\z"), pattern+" - "+description, callback, false)
+func (bot *Bot) Command(pattern string, description string, callback func(*Event)) {
+	bot.eventHandler.AddCommand(regexp.MustCompile("\\A"+bot.Name+"\\s+"+pattern+"\\z"), pattern+" - "+description, callback, false)
 }
 
-func (self *Bot) CommandWithArgv(pattern string, description string, callback func(*Event)) {
-	self.eventHandler.AddCommand(regexp.MustCompile("\\A"+self.Name+"\\s+"+pattern+"(?:\\s+(.+))*\\z"), pattern+" - "+description, callback, true)
+func (bot *Bot) CommandWithArgv(pattern string, description string, callback func(*Event)) {
+	bot.eventHandler.AddCommand(regexp.MustCompile("\\A"+bot.Name+"\\s+"+pattern+"(?:\\s+(.+))*\\z"), pattern+" - "+description, callback, true)
 }
 
-func (self *Bot) Appearance(user string, callback func(*Event)) {
-	self.eventHandler.Appearance(user, callback)
+func (bot *Bot) Appearance(user string, callback func(*Event)) {
+	bot.eventHandler.Appearance(user, callback)
 }
