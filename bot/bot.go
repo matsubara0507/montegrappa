@@ -22,16 +22,21 @@ var (
 type Bot struct {
 	Connector         Connector
 	Name              string
+	Persistance       Persistance
 	connectErrorChan  chan error
 	eventHandler      *EventHandler
 	connectRetryCount int
 	disconnectCount   int
 }
 
-func NewBot(connector Connector, name string, ignoreUsers []string, acceptUsers []string) *Bot {
+func NewBot(connector Connector, persistance Persistance, name string, ignoreUsers []string, acceptUsers []string) *Bot {
+	if persistance == nil {
+		persistance = &NoneDB{}
+	}
 	return &Bot{
 		Connector:         connector,
 		Name:              name,
+		Persistance:       persistance,
 		connectErrorChan:  make(chan error),
 		eventHandler:      NewEventHandler(ignoreUsers, acceptUsers),
 		connectRetryCount: 0,

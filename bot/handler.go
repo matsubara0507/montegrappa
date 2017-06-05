@@ -1,14 +1,10 @@
-package handler
-
-import (
-	"github.com/f110/montegrappa/bot"
-)
+package bot
 
 type Cmd struct {
 	Type        string
 	Pattern     string
 	Description string
-	Handler     func(*bot.Event)
+	Handler     func(*Event)
 }
 
 const (
@@ -18,7 +14,7 @@ const (
 
 var commands = make([]*Cmd, 0)
 
-func Init(bot *bot.Bot) {
+func Init(bot *Bot) {
 	for _, c := range commands {
 		switch c.Type {
 		case typeCmdWithArgv:
@@ -31,15 +27,15 @@ func Init(bot *bot.Bot) {
 	}
 }
 
-func AddCommand(pattern, description string, handler func(*bot.Event)) {
+func AddCommand(pattern, description string, handler func(*Event)) {
 	commands = append(commands, &Cmd{Pattern: pattern, Description: description, Handler: handler})
 }
 
-func AddCommandWithArgv(pattern, description string, handler func(*bot.Event)) {
+func AddCommandWithArgv(pattern, description string, handler func(*Event)) {
 	commands = append(commands, &Cmd{Type: typeCmdWithArgv, Pattern: pattern, Description: description, Handler: handler})
 }
 
-func Hear(pattern string, handler func(*bot.Event)) {
+func Hear(pattern string, handler func(*Event)) {
 	commands = append(commands, &Cmd{Type: typeHear, Pattern: pattern, Handler: handler})
 }
 

@@ -2,22 +2,27 @@ package slack
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/f110/montegrappa/db"
+	"net/http"
+	"sync"
+
 	"golang.org/x/oauth2"
 	slackOAuth "golang.org/x/oauth2/slack"
-	"log"
-	"net/http"
 )
 
 type AuthServer struct {
-	TeamID string
-	conf   *oauth2.Config
+	TeamID    string
+	TokenChan chan *oauth2.Token
+	conf      *oauth2.Config
+	server    *http.Server
+	mutex     sync.Mutex
 }
 
 func NewAuthServer(clientId, secret string, scopes []string, teamId string) *AuthServer {
 	authServer := &AuthServer{
-		TeamID: teamId,
+		TeamID:    teamId,
+		TokenChan: make(chan *oauth2.Token, 1),
 		conf: &oauth2.Config{
 			ClientID:     clientId,
 			ClientSecret: secret,
@@ -32,17 +37,20 @@ func NewAuthServer(clientId, secret string, scopes []string, teamId string) *Aut
 	return authServer
 }
 
-func (authServer *AuthServer) Start(addr string) {
-	log.Fatal(http.ListenAndServe(addr, nil))
+func (authServer *AuthServer) Start(addr string) error {
+	authServer.mutex.Lock()
+	if authServer.server == nil {
+		s := &http.Server{Addr: addr}
+		authServer.server = s
+	} else {
+		authServer.mutex.Unlock()
+		return errors.New("auth server already started")
+	}
+	authServer.mutex.Unlock()
+	return authServer.server.ListenAndServe()
 }
 
 func (authServer *AuthServer) startApp(w http.ResponseWriter, r *http.Request) {
-	if t, _ := db.GetToken(); t != "" {
-		fmt.Fprint(w, "already setup\n")
-		fmt.Fprint(w, t)
-		return
-	}
-
 	redirectURL := authServer.conf.AuthCodeURL("", oauth2.SetAuthURLParam("team", authServer.TeamID))
 	w.Header().Add("Location", redirectURL)
 	w.WriteHeader(http.StatusSeeOther)
@@ -57,6 +65,6 @@ func (authServer *AuthServer) oauthCallback(w http.ResponseWriter, r *http.Reque
 		fmt.Fprint(w, "failed")
 		return
 	}
-	db.WriteToken(token)
+	authServer.TokenChan <- token
 	fmt.Fprint(w, "success!!")
 }
