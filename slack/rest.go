@@ -246,6 +246,7 @@ func (slackConnector *SlackConnector) callRestAPI(ctx context.Context, method st
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	reqWithContext := req.WithContext(ctx)
 	return http.DefaultClient.Do(reqWithContext)
 }
