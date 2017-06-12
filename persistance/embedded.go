@@ -48,7 +48,7 @@ func (d *EmbeddedDB) Get(tableName string, key string) ([]byte, error) {
 
 func (d *EmbeddedDB) Set(tableName string, key string, value []byte) error {
 	return d.conn.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists([]byte(key))
+		b, err := tx.CreateBucketIfNotExists([]byte(tableName))
 		if err != nil {
 			return err
 		}
