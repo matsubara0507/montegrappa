@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"golang.org/x/oauth2"
 	slackOAuth "golang.org/x/oauth2/slack"
@@ -13,16 +14,24 @@ import (
 
 type AuthServer struct {
 	TeamID    string
-	TokenChan chan *oauth2.Token
+	TokenChan chan *Token
 	conf      *oauth2.Config
 	server    *http.Server
 	mutex     sync.Mutex
 }
 
+type Token struct {
+	AccessToken    string    `json:"access_token"`
+	RefreshToken   string    `json:"refresh_token,omitempty"`
+	Expiry         time.Time `json:"expiry,omitempty"`
+	BotUserID      string    `json:"bot_user_id,omitempty"`
+	BotAccessToken string    `json:"bot_access_token,omitempty"`
+}
+
 func NewAuthServer(clientId, secret string, scopes []string, teamId string) *AuthServer {
 	authServer := &AuthServer{
 		TeamID:    teamId,
-		TokenChan: make(chan *oauth2.Token, 1),
+		TokenChan: make(chan *Token, 1),
 		conf: &oauth2.Config{
 			ClientID:     clientId,
 			ClientSecret: secret,
@@ -65,6 +74,16 @@ func (authServer *AuthServer) oauthCallback(w http.ResponseWriter, r *http.Reque
 		fmt.Fprint(w, "failed")
 		return
 	}
-	authServer.TokenChan <- token
+	slackToken := Token{
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
+		Expiry:       token.Expiry,
+	}
+	bot, ok := token.Extra("bot").(map[string]interface{})
+	if ok {
+		slackToken.BotAccessToken = bot["bot_access_token"].(string)
+		slackToken.BotUserID = bot["bot_user_id"].(string)
+	}
+	authServer.TokenChan <- &slackToken
 	fmt.Fprint(w, "success!!")
 }
