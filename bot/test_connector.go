@@ -15,7 +15,8 @@ func NewTestConnector() *TestConnector {
 	return &TestConnector{}
 }
 
-func (c *TestConnector) Connect() {
+func (c *TestConnector) Connect() error {
+	return nil
 }
 
 func (c *TestConnector) Listen() error {

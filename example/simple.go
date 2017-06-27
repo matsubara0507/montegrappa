@@ -16,7 +16,7 @@ func main() {
 	AcceptUsers := make([]string, 0)
 
 	connector := slack.NewSlackConnector(Team, Token)
-	robot := bot.NewBot(connector, BotName, IgnoreUsers, AcceptUsers)
+	robot := bot.NewBot(connector, nil, BotName, IgnoreUsers, AcceptUsers)
 	robot.Command("ping", "ping pong", func(msg *bot.Event) {
 		msg.Sayf("pong %l", msg.User)
 	})

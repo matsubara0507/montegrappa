@@ -8,7 +8,7 @@ import (
 )
 
 type Connector interface {
-	Connect()
+	Connect() error
 	Listen() error
 	ReceivedEvent() chan *Event
 	Send(*Event, string, string) error

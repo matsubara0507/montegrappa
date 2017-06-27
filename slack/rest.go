@@ -1,17 +1,22 @@
 package slack
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/f110/montegrappa/bot"
 )
 
 var (
-	ErrUserNotFound    = errors.New("user not found")
-	ErrChannelNotFound = errors.New("channel not found")
+	ErrUserNotFound             = errors.New("user not found")
+	ErrChannelNotFound          = errors.New("channel not found")
+	ErrFailedPostMessage        = errors.New("Failed post message")
+	ErrFailedGetRTMEndpoint     = errors.New("Failed getting RTM Endpoind")
+	ErrFailedOpenPrivateChannel = errors.New("Failed open private channel")
 )
 
 type UserInfo struct {
@@ -29,6 +34,10 @@ type User struct {
 	Id       string `json:"id"`
 	Name     string `json:"name"`
 	RealName string `json:"real_name"`
+}
+
+type Channel struct {
+	Id string `json:"id"`
 }
 
 type UserInfoResponse struct {
@@ -51,20 +60,65 @@ type UserListResponse struct {
 	Members []User `json:"members"`
 }
 
-func (slackConnector *SlackConnector) GetUserInfo(userId string) (*UserInfo, error) {
-	v := url.Values{}
-	v.Set("token", slackConnector.token)
-	v.Set("user", userId)
+type PostMesssageResponse struct {
+	Ok bool   `json:"ok"`
+	Ts string `json:"ts"`
+}
 
-	res, err := http.PostForm("https://slack.com/api/users.info", v)
+type RTMConnectResponse struct {
+	Ok  bool   `json:"ok"`
+	URL string `json:"url"`
+}
+
+type IMOpenResponse struct {
+	Ok      bool    `json:"ok"`
+	Channel Channel `json:"channel"`
+}
+
+func (slackConnector *SlackConnector) PostMessage(channel, text, username string) (*PostMesssageResponse, error) {
+	v := url.Values{}
+	v.Set("channel", channel)
+	v.Set("text", text)
+	v.Set("as_user", "false")
+	if username != "" {
+		v.Set("username", username)
+	}
+
+	res, err := slackConnector.callRestAPI(context.Background(), "chat.postMessage", v)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	d := json.NewDecoder(res.Body)
-	resObj := new(UserInfoResponse)
-	d.Decode(resObj)
+	var resObj PostMesssageResponse
+	err = d.Decode(&resObj)
+	if err != nil {
+		return nil, err
+	}
+
+	if resObj.Ok == false {
+		return nil, ErrFailedPostMessage
+	}
+
+	return &resObj, nil
+}
+
+func (slackConnector *SlackConnector) GetUserInfo(userId string) (*UserInfo, error) {
+	v := url.Values{}
+	v.Set("user", userId)
+	res, err := slackConnector.callRestAPI(context.Background(), "users.info", v)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	d := json.NewDecoder(res.Body)
+	var resObj UserInfoResponse
+	err = d.Decode(&resObj)
+	if err != nil {
+		return nil, err
+	}
 
 	if resObj.Ok == false {
 		return nil, ErrUserNotFound
@@ -75,17 +129,19 @@ func (slackConnector *SlackConnector) GetUserInfo(userId string) (*UserInfo, err
 
 func (slackConnector *SlackConnector) GetChannelInfo(channelId string) (*bot.ChannelInfo, error) {
 	v := url.Values{}
-	v.Set("token", slackConnector.token)
 	v.Set("channel", channelId)
-	res, err := http.PostForm("https://slack.com/api/channels.info", v)
+	res, err := slackConnector.callRestAPI(context.Background(), "channels.info", v)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	d := json.NewDecoder(res.Body)
-	resObj := new(ChannelInfoResponse)
-	d.Decode(resObj)
+	var resObj ChannelInfoResponse
+	err = d.Decode(&resObj)
+	if err != nil {
+		return nil, err
+	}
 
 	if resObj.Ok == false {
 		return nil, ErrChannelNotFound
@@ -95,17 +151,18 @@ func (slackConnector *SlackConnector) GetChannelInfo(channelId string) (*bot.Cha
 }
 
 func (slackConnector *SlackConnector) GetTeamInfo() (*TeamInfo, error) {
-	v := url.Values{}
-	v.Set("token", slackConnector.token)
-	res, err := http.PostForm("https://slack.com/api/team.info", v)
+	res, err := slackConnector.callRestAPI(context.Background(), "team.info", url.Values{})
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	d := json.NewDecoder(res.Body)
-	resObj := new(TeamInfoResponse)
-	d.Decode(resObj)
+	var resObj TeamInfoResponse
+	err = d.Decode(&resObj)
+	if err != nil {
+		return nil, err
+	}
 
 	if resObj.Ok == false {
 		return nil, errors.New("something wrong")
@@ -116,21 +173,80 @@ func (slackConnector *SlackConnector) GetTeamInfo() (*TeamInfo, error) {
 
 func (slackConnector *SlackConnector) GetUserList() ([]User, error) {
 	v := url.Values{}
-	v.Set("token", slackConnector.token)
 	v.Set("presence", "false")
-	res, err := http.PostForm("https://slack.com/api/users.list", v)
+	res, err := slackConnector.callRestAPI(context.Background(), "users.list", v)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	d := json.NewDecoder(res.Body)
-	resObj := new(UserListResponse)
-	d.Decode(resObj)
+	var resObj UserListResponse
+	err = d.Decode(&resObj)
+	if err != nil {
+		return nil, err
+	}
 
 	if resObj.Ok == false {
 		return nil, errors.New("can not get users.list")
 	}
 
 	return resObj.Members, nil
+}
+
+func (slackConnector *SlackConnector) RTMConnect() (string, error) {
+	res, err := slackConnector.callRestAPI(context.Background(), "rtm.connect", url.Values{})
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+
+	d := json.NewDecoder(res.Body)
+	var resObj RTMConnectResponse
+	err = d.Decode(&resObj)
+	if err != nil {
+		return "", err
+	}
+
+	if resObj.Ok == false {
+		return "", ErrFailedGetRTMEndpoint
+	}
+
+	return resObj.URL, nil
+}
+
+func (slackConnector *SlackConnector) IMOpen(userId string) (*Channel, error) {
+	v := url.Values{}
+	v.Set("user", userId)
+	res, err := slackConnector.callRestAPI(context.Background(), "im.open", v)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	d := json.NewDecoder(res.Body)
+	var resObj IMOpenResponse
+	err = d.Decode(&resObj)
+	if err != nil {
+		return nil, err
+	}
+
+	if resObj.Ok == false {
+		return nil, ErrFailedOpenPrivateChannel
+	}
+
+	return &resObj.Channel, nil
+}
+
+func (slackConnector *SlackConnector) callRestAPI(ctx context.Context, method string, v url.Values) (*http.Response, error) {
+	v.Set("token", slackConnector.token)
+	b := strings.NewReader(v.Encode())
+
+	req, err := http.NewRequest("POST", "https://slack.com/api/"+method, b)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	reqWithContext := req.WithContext(ctx)
+	return http.DefaultClient.Do(reqWithContext)
 }

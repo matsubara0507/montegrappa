@@ -2,22 +2,36 @@ package slack
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/f110/montegrappa/db"
+	"net/http"
+	"sync"
+	"time"
+
 	"golang.org/x/oauth2"
 	slackOAuth "golang.org/x/oauth2/slack"
-	"log"
-	"net/http"
 )
 
 type AuthServer struct {
-	TeamID string
-	conf   *oauth2.Config
+	TeamID    string
+	TokenChan chan *Token
+	conf      *oauth2.Config
+	server    *http.Server
+	mutex     sync.Mutex
+}
+
+type Token struct {
+	AccessToken    string    `json:"access_token"`
+	RefreshToken   string    `json:"refresh_token,omitempty"`
+	Expiry         time.Time `json:"expiry,omitempty"`
+	BotUserID      string    `json:"bot_user_id,omitempty"`
+	BotAccessToken string    `json:"bot_access_token,omitempty"`
 }
 
 func NewAuthServer(clientId, secret string, scopes []string, teamId string) *AuthServer {
 	authServer := &AuthServer{
-		TeamID: teamId,
+		TeamID:    teamId,
+		TokenChan: make(chan *Token, 1),
 		conf: &oauth2.Config{
 			ClientID:     clientId,
 			ClientSecret: secret,
@@ -32,17 +46,20 @@ func NewAuthServer(clientId, secret string, scopes []string, teamId string) *Aut
 	return authServer
 }
 
-func (authServer *AuthServer) Start(addr string) {
-	log.Fatal(http.ListenAndServe(addr, nil))
+func (authServer *AuthServer) Start(addr string) error {
+	authServer.mutex.Lock()
+	if authServer.server == nil {
+		s := &http.Server{Addr: addr}
+		authServer.server = s
+	} else {
+		authServer.mutex.Unlock()
+		return errors.New("auth server already started")
+	}
+	authServer.mutex.Unlock()
+	return authServer.server.ListenAndServe()
 }
 
 func (authServer *AuthServer) startApp(w http.ResponseWriter, r *http.Request) {
-	if t, _ := db.GetToken(); t != "" {
-		fmt.Fprint(w, "already setup\n")
-		fmt.Fprint(w, t)
-		return
-	}
-
 	redirectURL := authServer.conf.AuthCodeURL("", oauth2.SetAuthURLParam("team", authServer.TeamID))
 	w.Header().Add("Location", redirectURL)
 	w.WriteHeader(http.StatusSeeOther)
@@ -57,6 +74,16 @@ func (authServer *AuthServer) oauthCallback(w http.ResponseWriter, r *http.Reque
 		fmt.Fprint(w, "failed")
 		return
 	}
-	db.WriteToken(token)
+	slackToken := Token{
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
+		Expiry:       token.Expiry,
+	}
+	bot, ok := token.Extra("bot").(map[string]interface{})
+	if ok {
+		slackToken.BotAccessToken = bot["bot_access_token"].(string)
+		slackToken.BotUserID = bot["bot_user_id"].(string)
+	}
+	authServer.TokenChan <- &slackToken
 	fmt.Fprint(w, "success!!")
 }
