@@ -1,13 +1,13 @@
 package bot
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"regexp"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 const (
@@ -27,6 +27,8 @@ type Bot struct {
 	eventHandler      *EventHandler
 	connectRetryCount int
 	disconnectCount   int
+	ctx               context.Context
+	cancel            context.CancelFunc
 }
 
 func NewBot(connector Connector, persistance Persistance, name string, ignoreUsers []string, acceptUsers []string) *Bot {
@@ -44,7 +46,11 @@ func NewBot(connector Connector, persistance Persistance, name string, ignoreUse
 	}
 }
 
-func (bot *Bot) Start() error {
+func (bot *Bot) Start(ctx context.Context) error {
+	c, cancel := context.WithCancel(ctx)
+	bot.ctx = c
+	bot.cancel = cancel
+
 	for {
 		for {
 			err := bot.Connect()
@@ -78,6 +84,9 @@ func (bot *Bot) Start() error {
 				bot.disconnectCount++
 				log.Printf("reconnect: %s", err)
 				break RECEIVE
+			case <-ctx.Done():
+				bot.Shutdown()
+				return nil
 			}
 		}
 	}
@@ -101,8 +110,28 @@ func (bot *Bot) Connect() error {
 	return nil
 }
 
-func (bot *Bot) Send(event *Event, text string) {
-	bot.Connector.Send(event, bot.Name, text)
+func (bot *Bot) Shutdown() error {
+	bot.Persistance.Close()
+	bot.cancel()
+	return nil
+}
+
+func (bot *Bot) Connect() error {
+	err := bot.Connector.Connect()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		res := bot.Connector.Listen()
+		if res != nil {
+			bot.connectErrorChan <- true
+		}
+	}()
+}
+
+func (self *Bot) Send(event *Event, text string) {
+	self.Connector.Send(event, self.Name, text)
 }
 
 func (bot *Bot) Sendf(event *Event, format string, a ...interface{}) {

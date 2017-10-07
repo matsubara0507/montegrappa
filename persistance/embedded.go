@@ -98,3 +98,7 @@ func (d *EmbeddedDB) ListPrefix(tableName string, prefix string) ([]string, erro
 
 	return keys, nil
 }
+
+func (d *EmbeddedDB) Close() error {
+	return d.conn.Close()
+}
