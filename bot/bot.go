@@ -94,6 +94,12 @@ func (bot *Bot) Start(ctx context.Context) error {
 	return nil
 }
 
+func (bot *Bot) Shutdown() error {
+	bot.Persistance.Close()
+	bot.cancel()
+	return nil
+}
+
 func (bot *Bot) Connect() error {
 	err := bot.Connector.Connect()
 	if err != nil {
@@ -108,26 +114,6 @@ func (bot *Bot) Connect() error {
 	}()
 
 	return nil
-}
-
-func (bot *Bot) Shutdown() error {
-	bot.Persistance.Close()
-	bot.cancel()
-	return nil
-}
-
-func (bot *Bot) Connect() error {
-	err := bot.Connector.Connect()
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		res := bot.Connector.Listen()
-		if res != nil {
-			bot.connectErrorChan <- true
-		}
-	}()
 }
 
 func (self *Bot) Send(event *Event, text string) {
