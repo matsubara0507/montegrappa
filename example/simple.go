@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -37,5 +38,5 @@ func main() {
 			msg.Say(v)
 		}
 	})
-	robot.Start()
+	robot.Start(context.Background())
 }
