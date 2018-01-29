@@ -212,6 +212,10 @@ func (slackConnector *SlackConnector) RTMConnect() (string, error) {
 		return "", ErrFailedGetRTMEndpoint
 	}
 
+	if resObj.URL == "" {
+		return "", ErrFailedGetRTMEndpoint
+	}
+
 	return resObj.URL, nil
 }
 

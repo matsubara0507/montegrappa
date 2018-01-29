@@ -65,3 +65,7 @@ func (m *MemoryDB) ListPrefix(tableName string, prefix string) ([]string, error)
 
 	return keys, nil
 }
+
+func (m *MemoryDB) Close() error {
+	return nil
+}
