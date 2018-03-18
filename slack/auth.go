@@ -59,6 +59,10 @@ func (authServer *AuthServer) Start(addr string) error {
 	return authServer.server.ListenAndServe()
 }
 
+func (authServer *AuthServer) Shutdown(ctx context.Context) error {
+	return authServer.server.Shutdown(ctx)
+}
+
 func (authServer *AuthServer) startApp(w http.ResponseWriter, r *http.Request) {
 	redirectURL := authServer.conf.AuthCodeURL("", oauth2.SetAuthURLParam("team", authServer.TeamID))
 	w.Header().Add("Location", redirectURL)
