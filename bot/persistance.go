@@ -1,6 +1,6 @@
 package bot
 
-type Persistance interface {
+type Persistence interface {
 	Get(tableName string, key string) (value []byte, err error)
 	Set(tableName string, key string, value []byte) (err error)
 	Delete(tableName string, key string) (err error)

@@ -22,7 +22,7 @@ var (
 type Bot struct {
 	Connector         Connector
 	Name              string
-	Persistance       Persistance
+	Persistance       Persistence
 	connectErrorChan  chan error
 	eventHandler      *EventHandler
 	connectRetryCount int
@@ -31,7 +31,7 @@ type Bot struct {
 	cancel            context.CancelFunc
 }
 
-func NewBot(connector Connector, persistance Persistance, name string, ignoreUsers []string, acceptUsers []string) *Bot {
+func NewBot(connector Connector, persistance Persistence, name string, ignoreUsers []string, acceptUsers []string) *Bot {
 	if persistance == nil {
 		persistance = &NoneDB{}
 	}
