@@ -50,6 +50,16 @@ func (m *MemoryDB) List(tableName string) ([]string, error) {
 	return keys, nil
 }
 
+func (m *MemoryDB) Delete(tableName, key string) error {
+	t, ok := m.storage[tableName]
+	if ok == false {
+		return ErrTableNotFound
+	}
+
+	delete(t, key)
+	return nil
+}
+
 func (m *MemoryDB) ListPrefix(tableName string, prefix string) ([]string, error) {
 	t, ok := m.storage[tableName]
 	if ok == false {
