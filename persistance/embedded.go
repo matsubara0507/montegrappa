@@ -14,7 +14,7 @@ var (
 )
 
 type EmbeddedDB struct {
-	conn *bolt.DB
+	Conn *bolt.DB
 }
 
 func NewEmbeddedDB(filePath string) *EmbeddedDB {
@@ -23,11 +23,11 @@ func NewEmbeddedDB(filePath string) *EmbeddedDB {
 		return nil
 	}
 
-	return &EmbeddedDB{conn: d}
+	return &EmbeddedDB{Conn: d}
 }
 
 func (d *EmbeddedDB) Get(tableName string, key string) ([]byte, error) {
-	tx, err := d.conn.Begin(false)
+	tx, err := d.Conn.Begin(false)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (d *EmbeddedDB) Get(tableName string, key string) ([]byte, error) {
 }
 
 func (d *EmbeddedDB) Set(tableName string, key string, value []byte) error {
-	return d.conn.Update(func(tx *bolt.Tx) error {
+	return d.Conn.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists([]byte(tableName))
 		if err != nil {
 			return err
@@ -56,8 +56,18 @@ func (d *EmbeddedDB) Set(tableName string, key string, value []byte) error {
 	})
 }
 
+func (d *EmbeddedDB) Delete(tableName, key string) error {
+	return d.Conn.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(tableName))
+		if b == nil {
+			return ErrTableNotFound
+		}
+		return b.Delete([]byte(key))
+	})
+}
+
 func (d *EmbeddedDB) List(tableName string) ([]string, error) {
-	tx, err := d.conn.Begin(false)
+	tx, err := d.Conn.Begin(false)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +88,7 @@ func (d *EmbeddedDB) List(tableName string) ([]string, error) {
 }
 
 func (d *EmbeddedDB) ListPrefix(tableName string, prefix string) ([]string, error) {
-	tx, err := d.conn.Begin(false)
+	tx, err := d.Conn.Begin(false)
 	if err != nil {
 		return nil, err
 	}
@@ -100,5 +110,5 @@ func (d *EmbeddedDB) ListPrefix(tableName string, prefix string) ([]string, erro
 }
 
 func (d *EmbeddedDB) Close() error {
-	return d.conn.Close()
+	return d.Conn.Close()
 }
