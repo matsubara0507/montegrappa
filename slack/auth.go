@@ -28,7 +28,7 @@ type Token struct {
 	BotAccessToken string    `json:"bot_access_token,omitempty"`
 }
 
-func NewAuthServer(clientId, secret string, scopes []string, teamId string) *AuthServer {
+func NewAuthServer(clientId, secret string, scopes []string, redirectUrl string, teamId string) *AuthServer {
 	authServer := &AuthServer{
 		TeamID:    teamId,
 		TokenChan: make(chan *Token, 1),
@@ -37,6 +37,7 @@ func NewAuthServer(clientId, secret string, scopes []string, teamId string) *Aut
 			ClientSecret: secret,
 			Scopes:       scopes,
 			Endpoint:     slackOAuth.Endpoint,
+			RedirectURL:  redirectUrl,
 		},
 	}
 

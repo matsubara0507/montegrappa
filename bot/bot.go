@@ -16,7 +16,7 @@ const (
 )
 
 var (
-	ErrFailedConnect = errors.New("Failed connect")
+	ErrFailedConnect = errors.New("failed connect")
 )
 
 type Bot struct {
