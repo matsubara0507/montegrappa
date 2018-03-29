@@ -17,13 +17,13 @@ type EmbeddedDB struct {
 	Conn *bolt.DB
 }
 
-func NewEmbeddedDB(filePath string) *EmbeddedDB {
+func NewEmbeddedDB(filePath string) (*EmbeddedDB, error) {
 	d, err := bolt.Open(filePath, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	return &EmbeddedDB{Conn: d}
+	return &EmbeddedDB{Conn: d}, nil
 }
 
 func (d *EmbeddedDB) Get(tableName string, key string) ([]byte, error) {
