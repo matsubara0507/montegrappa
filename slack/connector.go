@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	ReadBufferSize    = 512
+	ReadBufferSize    = 4096
 	ReadTimeout       = 1 * time.Minute
 	WriteTimeout      = 1 * time.Minute
 	HeartbeatInterval = 30 * time.Second
@@ -344,7 +344,8 @@ func (slackConnector *SlackConnector) startReading() {
 			if msg != nil {
 				msg = append(msg, tmp[:n]...)
 			} else {
-				msg = tmp[:n]
+				msg = make([]byte, n)
+				copy(msg, tmp[:n])
 			}
 			if n != ReadBufferSize {
 				slackConnector.bufChan <- msg
