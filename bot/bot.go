@@ -116,8 +116,12 @@ func (bot *Bot) Connect() error {
 	return nil
 }
 
-func (self *Bot) Send(event *Event, text string) {
-	self.Connector.Send(event, self.Name, text)
+func (bot *Bot) OnError(f OnError) {
+	bot.eventHandler.OnError = f
+}
+
+func (bot *Bot) Send(event *Event, text string) {
+	bot.Connector.Send(event, bot.Name, text)
 }
 
 func (bot *Bot) Sendf(event *Event, format string, a ...interface{}) {
