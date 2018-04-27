@@ -7,12 +7,15 @@ import (
 	"time"
 )
 
+type OnError func(*Event)
+
 type EventHandler struct {
 	accept      bool
 	acceptUsers map[string]bool
 	ignoreUsers map[string]bool
 	commands    map[string][]Command
 	mutex       *sync.RWMutex
+	OnError     OnError
 }
 
 type Command struct {
@@ -140,11 +143,7 @@ func (eventHandler *EventHandler) Handle(event *Event, async bool) {
 		switch event.Type {
 		case MessageEvent:
 			if command.CommandType == CommandTypeRequireResponse && event.Channel == command.channel && event.User.Id == command.user {
-				if async {
-					go command.callback(event)
-				} else {
-					command.callback(event)
-				}
+				eventHandler.commandCallback(command, event, async)
 				return
 			}
 			if command.CommandType == CommandTypeRequireResponse {
@@ -157,16 +156,12 @@ func (eventHandler *EventHandler) Handle(event *Event, async bool) {
 					event.Argv = strings.Fields(matched[1])
 				}
 
-				if async {
-					go command.callback(event)
-				} else {
-					command.callback(event)
-				}
+				eventHandler.commandCallback(command, event, async)
 				return
 			}
 		case UserTypingEvent:
 			if event.User.Id == command.user {
-				command.callback(event)
+				eventHandler.commandCallback(command, event, async)
 			}
 		case ReactionAddedEvent:
 			if time.Now().Sub(command.createdAt) >= ReactionExpire {
@@ -175,12 +170,29 @@ func (eventHandler *EventHandler) Handle(event *Event, async bool) {
 			}
 			if event.EventId() == command.messageId && event.User.Id == command.user && event.Reaction == command.reaction {
 				go eventHandler.RemoveRequireReaction(event.EventId(), event.Reaction)
-				if async {
-					go command.callback(event)
-				} else {
-					command.callback(event)
-				}
+				eventHandler.commandCallback(command, event, async)
 			}
 		}
 	}
+}
+
+func (eventHandler *EventHandler) commandCallback(command Command, event *Event, async bool) {
+	if async {
+		go func(command Command, event *Event, onError OnError) {
+			eventHandler.commandCallbackWithLog(command, event, onError)
+		}(command, event, eventHandler.OnError)
+	} else {
+		eventHandler.commandCallbackWithLog(command, event, eventHandler.OnError)
+	}
+}
+
+func (eventHandler *EventHandler) commandCallbackWithLog(command Command, event *Event, onError OnError) {
+	logging := true
+	defer func() {
+		if logging && onError != nil {
+			onError(event)
+		}
+	}()
+	command.callback(event)
+	logging = false
 }
