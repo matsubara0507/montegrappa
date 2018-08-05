@@ -87,7 +87,7 @@ func (bot *Bot) Start(ctx context.Context) error {
 					bot.eventHandler.Handle(event, false)
 					bot.Connector.Idle() <- true
 				}
-			case entry := <-bot.scheduler.TriggerdEvent():
+			case entry := <-bot.scheduler.TriggeredEvent():
 				e := entry.ToEvent()
 				e.Bot = bot
 				if bot.Connector.Async() {
@@ -201,6 +201,12 @@ func (bot *Bot) Appearance(user string, callback func(*Event)) {
 
 func (bot *Bot) Every(interval time.Duration, channel string, callback ScheduleFunc) {
 	if err := bot.scheduler.Every(interval, channel, callback); err != nil {
+		panic(err)
+	}
+}
+
+func (bot *Bot) At(every Every, hour, minute int, channel string, f ScheduleFunc) {
+	if err := bot.scheduler.At(every, hour, minute, channel, f); err != nil {
 		panic(err)
 	}
 }

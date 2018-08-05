@@ -14,6 +14,13 @@ var (
 	ErrIntervalLessThanMinute = errors.New("scheduler: interval must not be less than 1 minute")
 )
 
+type Every int
+
+const (
+	Hourly Every = iota
+	Daily
+)
+
 type ScheduleFunc func(event *Event)
 
 type ScheduleEntry struct {
@@ -73,7 +80,36 @@ func (scheduler *Scheduler) Every(interval time.Duration, channel string, f Sche
 	return scheduler.addEntry(interval, channel, f)
 }
 
-func (scheduler *Scheduler) TriggerdEvent() chan *ScheduleEntry {
+func (scheduler *Scheduler) At(every Every, hour, minute int, channel string, f ScheduleFunc) error {
+	now := time.Now()
+	loc, err := time.LoadLocation("Local")
+	if err != nil {
+		return err
+	}
+
+	entry := &ScheduleEntry{Channel: channel, f: f}
+	switch every {
+	case Hourly:
+		next := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), minute, 0, 0, loc)
+		if now.After(next) {
+			next = next.Add(time.Hour)
+		}
+		entry.interval = time.Hour
+		entry.next = next
+	case Daily:
+		next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, loc)
+		if now.After(next) {
+			next = next.Add(24 * time.Hour) // Add a day
+		}
+		entry.interval = 24 * time.Hour
+		entry.next = next
+	}
+	scheduler.entries = append(scheduler.entries, entry)
+
+	return nil
+}
+
+func (scheduler *Scheduler) TriggeredEvent() chan *ScheduleEntry {
 	return scheduler.eventChan
 }
 
