@@ -42,5 +42,8 @@ func main() {
 	robot.Every(1*time.Minute, ScheduleChannel, func(event *bot.Event) {
 		event.Say("Hi")
 	})
+	robot.At(bot.Daily, 19, 46, "C056M677R", func(event *bot.Event) {
+		event.Say("daily")
+	})
 	robot.Start(context.Background())
 }
