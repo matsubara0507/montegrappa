@@ -14,10 +14,10 @@ var (
 	ErrIntervalLessThanMinute = errors.New("scheduler: interval must not be less than 1 minute")
 )
 
-type Every int
+type UnitTime int
 
 const (
-	Hourly Every = iota
+	Hourly UnitTime = iota
 	Daily
 )
 
@@ -80,7 +80,7 @@ func (scheduler *Scheduler) Every(interval time.Duration, channel string, f Sche
 	return scheduler.addEntry(interval, channel, f)
 }
 
-func (scheduler *Scheduler) At(every Every, hour, minute int, channel string, f ScheduleFunc) error {
+func (scheduler *Scheduler) At(every UnitTime, hour, minute int, channel string, f ScheduleFunc) error {
 	now := time.Now()
 	loc, err := time.LoadLocation("Local")
 	if err != nil {
