@@ -205,8 +205,8 @@ func (bot *Bot) Every(interval time.Duration, channel string, callback ScheduleF
 	}
 }
 
-func (bot *Bot) At(every Every, hour, minute int, channel string, f ScheduleFunc) {
-	if err := bot.scheduler.At(every, hour, minute, channel, f); err != nil {
+func (bot *Bot) At(every UnitTime, hour, minute int, channel string, callback ScheduleFunc) {
+	if err := bot.scheduler.At(every, hour, minute, channel, callback); err != nil {
 		panic(err)
 	}
 }
