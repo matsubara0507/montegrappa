@@ -2,9 +2,8 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"time"
-
-	"github.com/git-lfs/git-lfs/errors"
 )
 
 const (
