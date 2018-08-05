@@ -7,19 +7,19 @@ import (
 	"time"
 )
 
-type OnError func(*Event)
-
 type EventHandler struct {
+	OnError OnError
+
 	accept      bool
 	acceptUsers map[string]bool
 	ignoreUsers map[string]bool
 	commands    map[string][]Command
 	mutex       *sync.RWMutex
-	OnError     OnError
 }
 
 type Command struct {
 	CommandType string
+
 	eventType   string
 	description string
 	pattern     *regexp.Regexp

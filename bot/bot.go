@@ -19,12 +19,16 @@ var (
 	ErrFailedConnect = errors.New("failed connect")
 )
 
+type OnError func(*Event)
+
 type Bot struct {
-	Connector         Connector
-	Name              string
-	Persistence       Persistence
+	Connector   Connector
+	Name        string
+	Persistence Persistence
+
 	connectErrorChan  chan error
 	eventHandler      *EventHandler
+	scheduler         *Scheduler
 	connectRetryCount int
 	disconnectCount   int
 	ctx               context.Context
@@ -41,6 +45,7 @@ func NewBot(connector Connector, persistence Persistence, name string, ignoreUse
 		Persistence:       persistence,
 		connectErrorChan:  make(chan error),
 		eventHandler:      NewEventHandler(ignoreUsers, acceptUsers),
+		scheduler:         NewScheduler(),
 		connectRetryCount: 0,
 		disconnectCount:   0,
 	}
@@ -50,6 +55,8 @@ func (bot *Bot) Start(ctx context.Context) error {
 	c, cancel := context.WithCancel(ctx)
 	bot.ctx = c
 	bot.cancel = cancel
+
+	go bot.scheduler.Start(bot.ctx)
 
 	for {
 		for {
@@ -78,6 +85,15 @@ func (bot *Bot) Start(ctx context.Context) error {
 					go bot.eventHandler.Handle(event, true)
 				} else {
 					bot.eventHandler.Handle(event, false)
+					bot.Connector.Idle() <- true
+				}
+			case entry := <-bot.scheduler.TriggerdEvent():
+				e := entry.ToEvent()
+				e.Bot = bot
+				if bot.Connector.Async() {
+					go entry.Execute(e)
+				} else {
+					entry.Execute(e)
 					bot.Connector.Idle() <- true
 				}
 			case err := <-bot.connectErrorChan:
@@ -181,4 +197,10 @@ func (bot *Bot) CommandWithArgv(pattern string, description string, callback fun
 
 func (bot *Bot) Appearance(user string, callback func(*Event)) {
 	bot.eventHandler.Appearance(user, callback)
+}
+
+func (bot *Bot) Every(interval time.Duration, channel string, callback ScheduleFunc) {
+	if err := bot.scheduler.Every(interval, channel, callback); err != nil {
+		panic(err)
+	}
 }

@@ -13,10 +13,11 @@ func main() {
 	Token := os.Getenv("SLACK_TOKEN")
 	BotName := "debug"
 	Team := "debug"
+	ScheduleChannel := "debug"
 	IgnoreUsers := make([]string, 0)
 	AcceptUsers := make([]string, 0)
 
-	connector := slack.NewSlackConnector(Team, Token)
+	connector := slack.NewConnector(Team, Token)
 	robot := bot.NewBot(connector, nil, BotName, IgnoreUsers, AcceptUsers)
 	robot.Command("ping", "ping pong", func(msg *bot.Event) {
 		msg.Sayf("pong %l", msg.User)
@@ -37,6 +38,9 @@ func main() {
 		for _, v := range msg.Argv {
 			msg.Say(v)
 		}
+	})
+	robot.Every(1*time.Minute, ScheduleChannel, func(event *bot.Event) {
+		event.Say("Hi")
 	})
 	robot.Start(context.Background())
 }
