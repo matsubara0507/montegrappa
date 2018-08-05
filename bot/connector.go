@@ -25,10 +25,11 @@ const (
 	MessageEvent       = "message"
 	UserTypingEvent    = "user_typing"
 	ReactionAddedEvent = "reaction_added"
+	ScheduledEvent     = "scheduled"
 	UnknownEvent       = "unknown"
 )
 
-type SendedMessage struct {
+type SentMessage struct {
 	Message   string
 	Channel   string
 	Timestamp string

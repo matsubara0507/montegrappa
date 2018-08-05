@@ -60,7 +60,7 @@ type UserListResponse struct {
 	Members []User `json:"members"`
 }
 
-type PostMesssageResponse struct {
+type PostMessageResponse struct {
 	Ok bool   `json:"ok"`
 	Ts string `json:"ts"`
 }
@@ -75,7 +75,7 @@ type IMOpenResponse struct {
 	Channel Channel `json:"channel"`
 }
 
-func (slackConnector *SlackConnector) PostMessage(channel, text, username string) (*PostMesssageResponse, error) {
+func (connector *Connector) PostMessage(channel, text, username string) (*PostMessageResponse, error) {
 	v := url.Values{}
 	v.Set("channel", channel)
 	v.Set("text", text)
@@ -84,14 +84,14 @@ func (slackConnector *SlackConnector) PostMessage(channel, text, username string
 		v.Set("username", username)
 	}
 
-	res, err := slackConnector.callRestAPI(context.Background(), "chat.postMessage", v)
+	res, err := connector.callRestAPI(context.Background(), "chat.postMessage", v)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
 
 	d := json.NewDecoder(res.Body)
-	var resObj PostMesssageResponse
+	var resObj PostMessageResponse
 	err = d.Decode(&resObj)
 	if err != nil {
 		return nil, err
@@ -104,10 +104,10 @@ func (slackConnector *SlackConnector) PostMessage(channel, text, username string
 	return &resObj, nil
 }
 
-func (slackConnector *SlackConnector) GetUserInfo(userId string) (*UserInfo, error) {
+func (connector *Connector) GetUserInfo(userId string) (*UserInfo, error) {
 	v := url.Values{}
 	v.Set("user", userId)
-	res, err := slackConnector.callRestAPI(context.Background(), "users.info", v)
+	res, err := connector.callRestAPI(context.Background(), "users.info", v)
 	if err != nil {
 		return nil, err
 	}
@@ -127,10 +127,10 @@ func (slackConnector *SlackConnector) GetUserInfo(userId string) (*UserInfo, err
 	return &resObj.User, nil
 }
 
-func (slackConnector *SlackConnector) GetChannelInfo(channelId string) (*bot.ChannelInfo, error) {
+func (connector *Connector) GetChannelInfo(channelId string) (*bot.ChannelInfo, error) {
 	v := url.Values{}
 	v.Set("channel", channelId)
-	res, err := slackConnector.callRestAPI(context.Background(), "channels.info", v)
+	res, err := connector.callRestAPI(context.Background(), "channels.info", v)
 	if err != nil {
 		return nil, err
 	}
@@ -150,8 +150,8 @@ func (slackConnector *SlackConnector) GetChannelInfo(channelId string) (*bot.Cha
 	return &resObj.Channel, nil
 }
 
-func (slackConnector *SlackConnector) GetTeamInfo() (*TeamInfo, error) {
-	res, err := slackConnector.callRestAPI(context.Background(), "team.info", url.Values{})
+func (connector *Connector) GetTeamInfo() (*TeamInfo, error) {
+	res, err := connector.callRestAPI(context.Background(), "team.info", url.Values{})
 	if err != nil {
 		return nil, err
 	}
@@ -171,10 +171,10 @@ func (slackConnector *SlackConnector) GetTeamInfo() (*TeamInfo, error) {
 	return &resObj.Team, nil
 }
 
-func (slackConnector *SlackConnector) GetUserList() ([]User, error) {
+func (connector *Connector) GetUserList() ([]User, error) {
 	v := url.Values{}
 	v.Set("presence", "false")
-	res, err := slackConnector.callRestAPI(context.Background(), "users.list", v)
+	res, err := connector.callRestAPI(context.Background(), "users.list", v)
 	if err != nil {
 		return nil, err
 	}
@@ -194,8 +194,8 @@ func (slackConnector *SlackConnector) GetUserList() ([]User, error) {
 	return resObj.Members, nil
 }
 
-func (slackConnector *SlackConnector) RTMConnect() (string, error) {
-	res, err := slackConnector.callRestAPI(context.Background(), "rtm.connect", url.Values{})
+func (connector *Connector) RTMConnect() (string, error) {
+	res, err := connector.callRestAPI(context.Background(), "rtm.connect", url.Values{})
 	if err != nil {
 		return "", err
 	}
@@ -219,10 +219,10 @@ func (slackConnector *SlackConnector) RTMConnect() (string, error) {
 	return resObj.URL, nil
 }
 
-func (slackConnector *SlackConnector) IMOpen(userId string) (*Channel, error) {
+func (connector *Connector) IMOpen(userId string) (*Channel, error) {
 	v := url.Values{}
 	v.Set("user", userId)
-	res, err := slackConnector.callRestAPI(context.Background(), "im.open", v)
+	res, err := connector.callRestAPI(context.Background(), "im.open", v)
 	if err != nil {
 		return nil, err
 	}
@@ -242,8 +242,8 @@ func (slackConnector *SlackConnector) IMOpen(userId string) (*Channel, error) {
 	return &resObj.Channel, nil
 }
 
-func (slackConnector *SlackConnector) callRestAPI(ctx context.Context, method string, v url.Values) (*http.Response, error) {
-	v.Set("token", slackConnector.token)
+func (connector *Connector) callRestAPI(ctx context.Context, method string, v url.Values) (*http.Response, error) {
+	v.Set("token", connector.token)
 	b := strings.NewReader(v.Encode())
 
 	req, err := http.NewRequest("POST", "https://slack.com/api/"+method, b)
