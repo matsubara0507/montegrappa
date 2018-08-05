@@ -2,9 +2,8 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"time"
-
-	"github.com/git-lfs/git-lfs/errors"
 )
 
 const (
@@ -12,7 +11,7 @@ const (
 )
 
 var (
-	ErrIntervalLessThanMinute = errors.New("scheduler: interval must not be less than 1 minute.")
+	ErrIntervalLessThanMinute = errors.New("scheduler: interval must not be less than 1 minute")
 )
 
 type ScheduleFunc func(event *Event)
