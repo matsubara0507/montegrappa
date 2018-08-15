@@ -14,9 +14,9 @@ import (
 var (
 	ErrUserNotFound             = errors.New("user not found")
 	ErrChannelNotFound          = errors.New("channel not found")
-	ErrFailedPostMessage        = errors.New("Failed post message")
-	ErrFailedGetRTMEndpoint     = errors.New("Failed getting RTM Endpoind")
-	ErrFailedOpenPrivateChannel = errors.New("Failed open private channel")
+	ErrFailedPostMessage        = errors.New("failed post message")
+	ErrFailedGetRTMEndpoint     = errors.New("failed getting RTM Endpoint")
+	ErrFailedOpenPrivateChannel = errors.New("failed open private channel")
 )
 
 type UserInfo struct {
@@ -37,7 +37,16 @@ type User struct {
 }
 
 type Channel struct {
-	Id string `json:"id"`
+	Id         string `json:"id"`
+	Name       string `json:"name"`
+	IsChannel  bool   `json:"is_channel"`
+	IsGroup    bool   `json:"is_group"`
+	IsIM       bool   `json:"is_im"`
+	IsMember   bool   `json:"is_member"`
+	IsPrivate  bool   `json:"is_private"`
+	IsGeneral  bool   `json:"is_general"`
+	IsMPIM     bool   `json:"is_mpim"`
+	NumMembers int    `json:"num_members"`
 }
 
 type UserInfoResponse struct {
@@ -73,6 +82,11 @@ type RTMConnectResponse struct {
 type IMOpenResponse struct {
 	Ok      bool    `json:"ok"`
 	Channel Channel `json:"channel"`
+}
+
+type ConversationListResponse struct {
+	Ok       bool      `json:"ok"`
+	Channels []Channel `json:"channels"`
 }
 
 func (connector *Connector) PostMessage(channel, text, username string) (*PostMessageResponse, error) {
@@ -240,6 +254,31 @@ func (connector *Connector) IMOpen(userId string) (*Channel, error) {
 	}
 
 	return &resObj.Channel, nil
+}
+
+func (connector *Connector) GetJoinedChannelList() ([]Channel, error) {
+	v := url.Values{}
+	v.Set("exclude_archived", "true")
+	v.Set("types", "public_channel,private_channel")
+	res, err := connector.callRestAPI(context.Background(), "conversations.list", v)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	var resObj ConversationListResponse
+	if err := json.NewDecoder(res.Body).Decode(&resObj); err != nil {
+		return nil, err
+	}
+
+	channels := make([]Channel, 0)
+	for _, c := range resObj.Channels {
+		if c.IsMember {
+			channels = append(channels, c)
+		}
+	}
+
+	return channels, nil
 }
 
 func (connector *Connector) callRestAPI(ctx context.Context, method string, v url.Values) (*http.Response, error) {

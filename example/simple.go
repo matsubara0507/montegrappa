@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"os"
 	"time"
 
@@ -13,7 +14,7 @@ func main() {
 	Token := os.Getenv("SLACK_TOKEN")
 	BotName := "debug"
 	Team := "debug"
-	ScheduleChannel := "debug"
+	ScheduleChannel := "C056M677R"
 	IgnoreUsers := make([]string, 0)
 	AcceptUsers := make([]string, 0)
 
@@ -34,13 +35,18 @@ func main() {
 		res := <-resChan
 		msg.Say(res)
 	})
-	robot.CommandWithArgv("test2", "test2", func(msg *bot.Event) {
-		for _, v := range msg.Argv {
-			msg.Say(v)
+	robot.Command("channels", "channels", func(msg *bot.Event) {
+		channels, err := msg.Bot.Connector.(*slack.Connector).GetJoinedChannelList()
+		if err != nil {
+			log.Print(err)
+			return
+		}
+		for _, c := range channels {
+			log.Printf("%s - %s", c.Name, c.Id)
 		}
 	})
-	robot.Every(1*time.Minute, ScheduleChannel, func(event *bot.Event) {
-		event.Say("Hi")
+	robot.Every(1*time.Hour, ScheduleChannel, func(event *bot.Event) {
+		event.Say("<!here> Hi")
 	})
 	robot.At(bot.Daily, 19, 46, "C056M677R", func(event *bot.Event) {
 		event.Say("daily")
