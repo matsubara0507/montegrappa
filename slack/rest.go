@@ -49,43 +49,52 @@ type Channel struct {
 	NumMembers int    `json:"num_members"`
 }
 
+type ResponseMetadata struct {
+	NextCursor string `json:"next_cursor"`
+}
+
+type Response struct {
+	Ok       bool             `json:"ok"`
+	Metadata ResponseMetadata `json:"response_metadata"`
+}
+
 type UserInfoResponse struct {
-	Ok   bool     `json:"ok"`
+	Response
 	User UserInfo `json:"user"`
 }
 
 type ChannelInfoResponse struct {
-	Ok      bool            `json:"ok"`
+	Response
 	Channel bot.ChannelInfo `json:"channel"`
 }
 
 type TeamInfoResponse struct {
-	Ok   bool     `json:"ok"`
+	Response
 	Team TeamInfo `json:"team"`
 }
 
 type UserListResponse struct {
-	Ok      bool   `json:"ok"`
+	Response
 	Members []User `json:"members"`
 }
 
 type PostMessageResponse struct {
-	Ok bool   `json:"ok"`
+	Response
 	Ts string `json:"ts"`
 }
 
 type RTMConnectResponse struct {
-	Ok  bool   `json:"ok"`
+	Response
 	URL string `json:"url"`
 }
 
 type IMOpenResponse struct {
-	Ok      bool    `json:"ok"`
+	Response
 	Channel Channel `json:"channel"`
 }
 
 type ConversationListResponse struct {
-	Ok       bool      `json:"ok"`
+	Response
 	Channels []Channel `json:"channels"`
 }
 
@@ -257,28 +266,54 @@ func (connector *Connector) IMOpen(userId string) (*Channel, error) {
 }
 
 func (connector *Connector) GetJoinedChannelList() ([]Channel, error) {
+	channels := make([]Channel, 0)
+
+	cursor := ""
+	for {
+		fetchedChannels, c, err := connector.conversationsList(cursor)
+		if err != nil {
+			return nil, err
+		}
+		if len(fetchedChannels) == 0 {
+			break
+		}
+
+		for _, c := range fetchedChannels {
+			if c.IsMember {
+				channels = append(channels, c)
+			}
+		}
+
+		if c == "" {
+			break
+		} else {
+			cursor = c
+		}
+	}
+
+	return channels, nil
+}
+
+func (connector *Connector) conversationsList(cursor string) ([]Channel, string, error) {
 	v := url.Values{}
 	v.Set("exclude_archived", "true")
+	v.Set("limit", "1000")
 	v.Set("types", "public_channel,private_channel")
+	if cursor != "" {
+		v.Set("cursor", cursor)
+	}
 	res, err := connector.callRestAPI(context.Background(), "conversations.list", v)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer res.Body.Close()
 
 	var resObj ConversationListResponse
 	if err := json.NewDecoder(res.Body).Decode(&resObj); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	channels := make([]Channel, 0)
-	for _, c := range resObj.Channels {
-		if c.IsMember {
-			channels = append(channels, c)
-		}
-	}
-
-	return channels, nil
+	return resObj.Channels, resObj.Metadata.NextCursor, nil
 }
 
 func (connector *Connector) callRestAPI(ctx context.Context, method string, v url.Values) (*http.Response, error) {
