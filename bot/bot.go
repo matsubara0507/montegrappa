@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -225,6 +226,8 @@ func (bot *Bot) Help() string {
 		}
 		descriptions = append(descriptions, command.description)
 	}
+
+	sort.Strings(descriptions)
 
 	return strings.Join(descriptions, "\n")
 }
