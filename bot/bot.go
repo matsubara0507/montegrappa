@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -209,4 +210,18 @@ func (bot *Bot) At(every UnitTime, hour, minute int, channel string, callback Sc
 	if err := bot.scheduler.At(every, hour, minute, channel, callback); err != nil {
 		panic(err)
 	}
+}
+
+func (bot *Bot) Help() string {
+	commands := bot.eventHandler.commands[MessageEvent]
+	descriptions := make([]string, 0, len(commands))
+	for _, command := range commands {
+		// CommandTypeRequireResponse is a temporary event.
+		if command.CommandType == CommandTypeRequireResponse {
+			continue
+		}
+		descriptions = append(descriptions, command.description)
+	}
+
+	return strings.Join(descriptions, "\n")
 }
