@@ -190,11 +190,19 @@ func (bot *Bot) Hear(pattern string, callback func(*Event)) {
 }
 
 func (bot *Bot) Command(pattern string, description string, callback func(*Event)) {
-	bot.eventHandler.AddCommand(regexp.MustCompile("\\A"+bot.Name+"\\s+"+pattern+"\\z"), pattern+" - "+description, callback, false)
+	desc := ""
+	if description != "" {
+		desc = pattern + " - " + description
+	}
+	bot.eventHandler.AddCommand(regexp.MustCompile("\\A"+bot.Name+"\\s+"+pattern+"\\z"), desc, callback, false)
 }
 
 func (bot *Bot) CommandWithArgv(pattern string, description string, callback func(*Event)) {
-	bot.eventHandler.AddCommand(regexp.MustCompile("\\A"+bot.Name+"\\s+"+pattern+"(?:\\s+(.+))*\\z"), pattern+" - "+description, callback, true)
+	desc := ""
+	if description != "" {
+		desc = pattern + " - " + description
+	}
+	bot.eventHandler.AddCommand(regexp.MustCompile("\\A"+bot.Name+"\\s+"+pattern+"(?:\\s+(.+))*\\z"), desc, callback, true)
 }
 
 func (bot *Bot) Appearance(user string, callback func(*Event)) {
