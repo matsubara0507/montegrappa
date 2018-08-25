@@ -220,6 +220,9 @@ func (bot *Bot) Help() string {
 		if command.CommandType == CommandTypeRequireResponse {
 			continue
 		}
+		if command.description == "" {
+			continue
+		}
 		descriptions = append(descriptions, command.description)
 	}
 
