@@ -7,6 +7,8 @@ import (
 	"io"
 	"log"
 	"regexp"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -188,11 +190,19 @@ func (bot *Bot) Hear(pattern string, callback func(*Event)) {
 }
 
 func (bot *Bot) Command(pattern string, description string, callback func(*Event)) {
-	bot.eventHandler.AddCommand(regexp.MustCompile("\\A"+bot.Name+"\\s+"+pattern+"\\z"), pattern+" - "+description, callback, false)
+	desc := ""
+	if description != "" {
+		desc = pattern + " - " + description
+	}
+	bot.eventHandler.AddCommand(regexp.MustCompile("\\A"+bot.Name+"\\s+"+pattern+"\\z"), desc, callback, false)
 }
 
 func (bot *Bot) CommandWithArgv(pattern string, description string, callback func(*Event)) {
-	bot.eventHandler.AddCommand(regexp.MustCompile("\\A"+bot.Name+"\\s+"+pattern+"(?:\\s+(.+))*\\z"), pattern+" - "+description, callback, true)
+	desc := ""
+	if description != "" {
+		desc = pattern + " - " + description
+	}
+	bot.eventHandler.AddCommand(regexp.MustCompile("\\A"+bot.Name+"\\s+"+pattern+"(?:\\s+(.+))*\\z"), desc, callback, true)
 }
 
 func (bot *Bot) Appearance(user string, callback func(*Event)) {
@@ -209,4 +219,23 @@ func (bot *Bot) At(every UnitTime, hour, minute int, channel string, callback Sc
 	if err := bot.scheduler.At(every, hour, minute, channel, callback); err != nil {
 		panic(err)
 	}
+}
+
+func (bot *Bot) Help() string {
+	commands := bot.eventHandler.commands[MessageEvent]
+	descriptions := make([]string, 0, len(commands))
+	for _, command := range commands {
+		// CommandTypeRequireResponse is a temporary event.
+		if command.CommandType == CommandTypeRequireResponse {
+			continue
+		}
+		if command.description == "" {
+			continue
+		}
+		descriptions = append(descriptions, command.description)
+	}
+
+	sort.Strings(descriptions)
+
+	return strings.Join(descriptions, "\n")
 }
