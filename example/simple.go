@@ -45,6 +45,9 @@ func main() {
 			log.Printf("%s - %s", c.Name, c.Id)
 		}
 	})
+	robot.WatchReaction("thumbsup", func(msg *bot.Event) {
+		log.Print(msg)
+	})
 	robot.Every(1*time.Hour, ScheduleChannel, func(event *bot.Event) {
 		event.Say("<!here> Hi")
 	})
