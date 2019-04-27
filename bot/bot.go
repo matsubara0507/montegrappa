@@ -209,6 +209,10 @@ func (bot *Bot) Appearance(user string, callback func(*Event)) {
 	bot.eventHandler.Appearance(user, callback)
 }
 
+func (bot *Bot) WatchReaction(reaction string, callback func(*Event)) {
+	bot.eventHandler.WatchReaction(reaction, callback)
+}
+
 func (bot *Bot) Every(interval time.Duration, channel string, callback ScheduleFunc) {
 	if err := bot.scheduler.Every(interval, channel, callback); err != nil {
 		panic(err)
