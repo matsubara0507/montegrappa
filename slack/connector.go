@@ -238,7 +238,7 @@ func (connector *Connector) SendPrivate(event *bot.Event, userId, text string) e
 
 func (connector *Connector) Attach(event *bot.Event, fileName string, file io.Reader, title string) error {
 	_, err := connector.client.UploadFile(slack.FileUploadParameters{
-		File:     fileName,
+		Filename: fileName,
 		Channels: []string{event.Channel},
 		Reader:   file,
 		Title:    title,
