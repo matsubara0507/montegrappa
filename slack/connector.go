@@ -283,6 +283,18 @@ func (connector *Connector) teamDomain() string {
 	return connector.domain
 }
 
+func (connector *Connector) GetChannelInfo(channelId string) (*bot.ChannelInfo, error) {
+	channel, err := connector.client.GetChannelInfo(channelId)
+	if err != nil {
+		return nil, err
+	}
+
+	var res bot.ChannelInfo
+	res.Name = channel.Name
+	res.Id = channel.ID
+	return &res, nil
+}
+
 func (connector *Connector) startReading() {
 	log.Print("start reading")
 	var msg []byte
