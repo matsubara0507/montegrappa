@@ -1,21 +1,19 @@
 package slack
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/f110/montegrappa/bot"
+	"github.com/nlopes/slack"
 	"golang.org/x/net/websocket"
 )
 
@@ -39,6 +37,7 @@ type Connector struct {
 	errorChan  chan error
 	startTime  int
 	connection *websocket.Conn
+	client     *slack.Client
 }
 
 type Ping struct {
@@ -95,20 +94,22 @@ func NewConnector(teamId, token string) *Connector {
 
 	return &Connector{
 		token:     token,
+		teamId:    teamId,
 		startTime: startTime,
 		eventChan: make(chan *bot.Event),
 		errorChan: make(chan error),
 		mutex:     &sync.Mutex{},
+		client:    slack.New(token),
 	}
 }
 
 func (connector *Connector) Connect() error {
-	url, err := connector.RTMConnect()
+	_, u, err := connector.client.ConnectRTM()
 	if err != nil {
 		return err
 	}
-	log.Printf("start connect to %s", url)
-	ws, err := websocket.Dial(url, "", "http://localhost")
+	log.Printf("start connect to %s", u)
+	ws, err := websocket.Dial(u, "", "http://localhost")
 	if err != nil {
 		return err
 	}
@@ -124,18 +125,23 @@ func (*Connector) Async() bool {
 	return true
 }
 
+func (connector *Connector) Client() *slack.Client {
+	return connector.client
+}
+
 func (connector *Connector) Listen() error {
 	for {
 		select {
 		case buf := <-connector.bufChan:
 			var event Event
-			json.Unmarshal(buf, &event)
+			if err := json.Unmarshal(buf, &event); err != nil {
+				continue
+			}
 
 			if event.Ts != "" {
 				ts := strings.Split(event.Ts, ".")[0]
 				i, _ := strconv.Atoi(ts)
 				if i < connector.startTime {
-					log.Print("skip event")
 					continue
 				}
 			}
@@ -144,7 +150,9 @@ func (connector *Connector) Listen() error {
 			switch event.Type {
 			case "message":
 				var messageEvent Message
-				json.Unmarshal(buf, &messageEvent)
+				if err := json.Unmarshal(buf, &messageEvent); err != nil {
+					continue
+				}
 				if messageEvent.User == "" {
 					continue
 				}
@@ -156,7 +164,9 @@ func (connector *Connector) Listen() error {
 				botEvent.Ts = messageEvent.Ts
 			case "user_typing":
 				var userTypingEvent UserTyping
-				json.Unmarshal(buf, &userTypingEvent)
+				if err := json.Unmarshal(buf, &userTypingEvent); err != nil {
+					continue
+				}
 				if userTypingEvent.User == "" {
 					continue
 				}
@@ -169,7 +179,9 @@ func (connector *Connector) Listen() error {
 			case "reaction_added":
 				botEvent.Type = bot.ReactionAddedEvent
 				reactionAdded := new(ReactionAdded)
-				json.Unmarshal(buf, reactionAdded)
+				if err := json.Unmarshal(buf, reactionAdded); err != nil {
+					continue
+				}
 				if reactionAdded.Item.Type != "message" {
 					continue
 				}
@@ -183,7 +195,6 @@ func (connector *Connector) Listen() error {
 
 			connector.eventChan <- botEvent
 		case <-connector.errorChan:
-			log.Print("disconnect server")
 			return errors.New("disconnect")
 		}
 	}
@@ -198,7 +209,7 @@ func (connector *Connector) Idle() chan bool {
 }
 
 func (connector *Connector) Send(event *bot.Event, username string, text string) error {
-	_, err := connector.PostMessage(event.Channel, text, "")
+	_, _, err := connector.client.PostMessage(event.Channel, slack.MsgOptionUsername(username), slack.MsgOptionText(text, false))
 	if err != nil {
 		return err
 	}
@@ -207,87 +218,34 @@ func (connector *Connector) Send(event *bot.Event, username string, text string)
 }
 
 func (connector *Connector) SendWithConfirm(event *bot.Event, username, text string) (string, error) {
-	res, err := connector.PostMessage(event.Channel, text, username)
+	_, ts, err := connector.client.PostMessage(event.Channel, slack.MsgOptionUsername(username), slack.MsgOptionText(text, false))
 	if err != nil {
 		return "", err
 	}
 
-	return res.Ts, nil
+	return ts, nil
 }
 
 func (connector *Connector) SendPrivate(event *bot.Event, userId, text string) error {
-	channel, err := connector.IMOpen(userId)
+	_, _, channelId, err := connector.client.OpenIMChannel(userId)
 	if err != nil {
 		return err
 	}
 
-	_, err = connector.PostMessage(channel.Id, text, "")
+	_, _, err = connector.client.PostMessage(channelId, slack.MsgOptionText(text, false))
 	return err
 }
 
 func (connector *Connector) Attach(event *bot.Event, fileName string, file io.Reader, title string) error {
-	buf := bytes.NewBuffer([]byte{})
-	w := multipart.NewWriter(buf)
-	f, err := w.CreateFormField("token")
-	if err != nil {
-		return err
-	}
-	f.Write([]byte(connector.token))
-	f, err = w.CreateFormField("channels")
-	if err != nil {
-		return err
-	}
-	f.Write([]byte(event.Channel))
-	f, err = w.CreateFormField("title")
-	if err != nil {
-		return err
-	}
-	f.Write([]byte(title))
-	f, err = w.CreateFormField("filetype")
-	if err != nil {
-		return err
-	}
-	f.Write([]byte("auto"))
-	f, err = w.CreateFormField("filename")
-	if err != nil {
-		return err
-	}
-	f.Write([]byte(fileName))
-	f, err = w.CreateFormFile("file", fileName)
-	if err != nil {
-		return err
-	}
-	io.Copy(f, file)
-	w.Close()
+	_, err := connector.client.UploadFile(slack.FileUploadParameters{
+		File:     fileName,
+		Channels: []string{event.Channel},
+		Reader:   file,
+		Title:    title,
+		Filetype: "auto",
+	})
 
-	req, err := http.NewRequest("POST", "https://slack.com/api/files.upload", buf)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", w.FormDataContentType())
-
-	client := &http.Client{}
-	res, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return errors.New("Failed file upload")
-	}
-
-	dec := json.NewDecoder(res.Body)
-	var data struct {
-		Ok    bool   `json:"ok"`
-		Error string `json:"error"`
-	}
-	dec.Decode(&data)
-	if data.Ok == false {
-		return errors.New(data.Error)
-	}
-
-	return nil
+	return err
 }
 
 func (connector *Connector) WithIndicate(channel string) context.CancelFunc {
@@ -301,7 +259,7 @@ func (connector *Connector) WithIndicate(channel string) context.CancelFunc {
 			case <-ctx.Done():
 				break LOOP
 			case <-t:
-				connector.sendTyping(c)
+				_ = connector.sendTyping(c)
 			}
 		}
 	}(channel)
@@ -315,7 +273,7 @@ func (connector *Connector) GetPermalink(event *bot.Event) string {
 
 func (connector *Connector) teamDomain() string {
 	if connector.domain == "" {
-		info, err := connector.GetTeamInfo()
+		info, err := connector.client.GetTeamInfo()
 		if err != nil {
 			return ""
 		}
@@ -333,7 +291,9 @@ func (connector *Connector) startReading() {
 	go func() {
 		tmp := make([]byte, ReadBufferSize)
 		for {
-			connector.connection.SetReadDeadline(time.Now().Add(ReadTimeout))
+			if err := connector.connection.SetReadDeadline(time.Now().Add(ReadTimeout)); err != nil {
+				break
+			}
 			n, err := connector.connection.Read(tmp)
 			if err == io.EOF {
 				break
@@ -389,33 +349,28 @@ func (connector *Connector) sendPing(id int) error {
 	ping := &Ping{Id: id, Type: "ping", Time: int(time.Now().Unix())}
 	buf, err := json.Marshal(ping)
 	if err != nil {
-		log.Print("failed json.Marshal")
 		return err
 	}
 
-	connector.connection.SetWriteDeadline(time.Now().Add(WriteTimeout))
+	if err := connector.connection.SetWriteDeadline(time.Now().Add(WriteTimeout)); err != nil {
+		return err
+	}
 	_, err = connector.connection.Write(buf)
-	if err != nil {
-		log.Print("failed send ping")
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (connector *Connector) sendTyping(channel string) error {
 	typing := &Typing{Id: 1, Type: "typing", Channel: channel}
 	buf, err := json.Marshal(typing)
 	if err != nil {
-		log.Print("faild json.Marshal")
 		return err
 	}
 
-	connector.connection.SetWriteDeadline(time.Now().Add(WriteTimeout))
+	if err := connector.connection.SetWriteDeadline(time.Now().Add(WriteTimeout)); err != nil {
+		return err
+	}
 	_, err = connector.connection.Write(buf)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
