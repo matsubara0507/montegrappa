@@ -179,15 +179,19 @@ func (eventHandler *EventHandler) Handle(event *Event, async bool) {
 				go eventHandler.RemoveRequireReaction(command.messageId, command.reaction)
 				continue
 			}
-			if command.requestReactionFromOther && event.EventId() == command.messageId && event.User.Id != command.user && event.Reaction == command.reaction {
-				go eventHandler.RemoveRequireReaction(event.EventId(), event.Reaction)
-				eventHandler.commandCallback(command, event, async)
-				return
-			}
-			if event.EventId() == command.messageId && event.User.Id == command.user && event.Reaction == command.reaction {
-				go eventHandler.RemoveRequireReaction(event.EventId(), event.Reaction)
-				eventHandler.commandCallback(command, event, async)
-				return
+			if command.requestReactionFromOther {
+				if event.EventId() == command.messageId && event.User.Id != command.user && event.Reaction == command.reaction {
+					go eventHandler.RemoveRequireReaction(event.EventId(), event.Reaction)
+					eventHandler.commandCallback(command, event, async)
+					return
+				}
+				continue
+			} else {
+				if event.EventId() == command.messageId && event.User.Id == command.user && event.Reaction == command.reaction {
+					go eventHandler.RemoveRequireReaction(event.EventId(), event.Reaction)
+					eventHandler.commandCallback(command, event, async)
+					return
+				}
 			}
 			if event.Reaction == command.reaction {
 				eventHandler.commandCallback(command, event, async)
