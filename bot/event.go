@@ -48,6 +48,10 @@ func (event *Event) SayWithConfirmf(reaction string, callback func(*Event), form
 	event.Bot.SendWithConfirmf(event, reaction, callback, format, a...)
 }
 
+func (event *Event) SayAndRequestReactionFromOther(text, reaction string, callback func(*Event)) {
+	event.Bot.SendAndRequestReactFromOther(event, text, reaction, callback)
+}
+
 func (event *Event) SayRequireResponse(text string) (func(), chan string) {
 	return event.Bot.SendRequireResponse(event, text)
 }

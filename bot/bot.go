@@ -152,6 +152,11 @@ func (bot *Bot) SendWithConfirm(event *Event, text, reaction string, callback fu
 	bot.eventHandler.RequireReaction(event.Channel, id, reaction, event.User.Id, callback)
 }
 
+func (bot *Bot) SendAndRequestReactFromOther(event *Event, text, reaction string, callback func(*Event)) {
+	id, _ := bot.Connector.SendWithConfirm(event, bot.Name, text)
+	bot.eventHandler.RequireReactionByOther(event.Channel, id, reaction, event.User.Id, callback)
+}
+
 func (bot *Bot) SendWithConfirmf(event *Event, reaction string, callback func(*Event), format string, a ...interface{}) {
 	text := fmt.Sprintf(format, a)
 	bot.SendWithConfirm(event, text, reaction, callback)

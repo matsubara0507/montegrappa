@@ -20,16 +20,17 @@ type EventHandler struct {
 type Command struct {
 	CommandType string
 
-	eventType   string
-	description string
-	pattern     *regexp.Regexp
-	channel     string
-	user        string
-	argv        bool
-	messageId   string
-	reaction    string
-	callback    func(*Event)
-	createdAt   time.Time
+	eventType                string
+	description              string
+	pattern                  *regexp.Regexp
+	channel                  string
+	user                     string
+	argv                     bool
+	messageId                string
+	reaction                 string
+	requestReactionFromOther bool
+	callback                 func(*Event)
+	createdAt                time.Time
 }
 
 const (
@@ -81,6 +82,11 @@ func (eventHandler *EventHandler) WatchReaction(reaction string, callback func(*
 
 func (eventHandler *EventHandler) RequireReaction(channel, id, reaction, userId string, callback func(*Event)) {
 	c := &Command{messageId: channel + id, reaction: reaction, user: userId, callback: callback, createdAt: time.Now()}
+	go eventHandler.AddHandler(ReactionAddedEvent, c)
+}
+
+func (eventHandler *EventHandler) RequireReactionByOther(channel, id, reaction, userId string, callback func(*Event)) {
+	c := &Command{messageId: channel + id, reaction: reaction, callback: callback, user: userId, requestReactionFromOther: true, createdAt: time.Now()}
 	go eventHandler.AddHandler(ReactionAddedEvent, c)
 }
 
@@ -173,10 +179,19 @@ func (eventHandler *EventHandler) Handle(event *Event, async bool) {
 				go eventHandler.RemoveRequireReaction(command.messageId, command.reaction)
 				continue
 			}
-			if event.EventId() == command.messageId && event.User.Id == command.user && event.Reaction == command.reaction {
-				go eventHandler.RemoveRequireReaction(event.EventId(), event.Reaction)
-				eventHandler.commandCallback(command, event, async)
-				return
+			if command.requestReactionFromOther {
+				if event.EventId() == command.messageId && event.User.Id != command.user && event.Reaction == command.reaction {
+					go eventHandler.RemoveRequireReaction(event.EventId(), event.Reaction)
+					eventHandler.commandCallback(command, event, async)
+					return
+				}
+				continue
+			} else {
+				if event.EventId() == command.messageId && event.User.Id == command.user && event.Reaction == command.reaction {
+					go eventHandler.RemoveRequireReaction(event.EventId(), event.Reaction)
+					eventHandler.commandCallback(command, event, async)
+					return
+				}
 			}
 			if event.Reaction == command.reaction {
 				eventHandler.commandCallback(command, event, async)
