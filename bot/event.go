@@ -24,7 +24,7 @@ func (event *Event) EventId() string {
 }
 
 func (event *Event) ChannelName() (string, error) {
-	channelInfo, err := event.Bot.Connector.GetChannelInfo(event.Channel)
+	channelInfo, err := event.Bot.Client.GetChannelInfo(event.Channel)
 	if err != nil {
 		return "", err
 	}

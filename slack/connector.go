@@ -103,7 +103,7 @@ func NewConnector(teamId, token string) *Connector {
 	}
 }
 
-func (connector *Connector) Connect() error {
+func (connector *Connector) Setup() error {
 	_, u, err := connector.client.ConnectRTM()
 	if err != nil {
 		return err
@@ -129,7 +129,7 @@ func (connector *Connector) Client() *slack.Client {
 	return connector.client
 }
 
-func (connector *Connector) Listen() error {
+func (connector *Connector) Start() error {
 	for {
 		select {
 		case buf := <-connector.bufChan:
