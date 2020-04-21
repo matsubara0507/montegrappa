@@ -8,7 +8,7 @@ import (
 
 	"github.com/f110/montegrappa/bot"
 	slackConnector "github.com/f110/montegrappa/slack"
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 )
 
 func main() {
