@@ -5,7 +5,9 @@ import (
 )
 
 func init() {
-	bot.AddCommand("ping", "ピンポン", PingHandler)
+	bot.DefineHandler(func(bot *bot.Bot) {
+		bot.Command("ping", "ピンポン", PingHandler)
+	})
 }
 
 func PingHandler(msg *bot.Event) {
