@@ -158,7 +158,7 @@ func (bot *Bot) SendAndRequestReactFromOther(event *Event, text, reaction string
 }
 
 func (bot *Bot) SendWithConfirmf(event *Event, reaction string, callback func(*Event), format string, a ...interface{}) {
-	text := fmt.Sprintf(format, a)
+	text := fmt.Sprintf(format, a...)
 	bot.SendWithConfirm(event, text, reaction, callback)
 }
 
@@ -168,7 +168,7 @@ func (bot *Bot) SendRequireResponse(event *Event, text string) (func(), chan str
 }
 
 func (bot *Bot) SendRequireResponsef(event *Event, format string, a ...interface{}) (func(), chan string) {
-	text := fmt.Sprintf(format, a)
+	text := fmt.Sprintf(format, a...)
 	return bot.SendRequireResponse(event, text)
 }
 
