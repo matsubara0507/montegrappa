@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/f110/montegrappa/bot"
-	"github.com/nlopes/slack"
+	"github.com/slack-go/slack"
 	"golang.org/x/net/websocket"
 )
 

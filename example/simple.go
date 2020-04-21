@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"github.com/f110/montegrappa/bot"
-	"github.com/f110/montegrappa/slack"
+	slackConnector "github.com/f110/montegrappa/slack"
+	"github.com/slack-go/slack"
 )
 
 func main() {
@@ -18,7 +19,7 @@ func main() {
 	IgnoreUsers := make([]string, 0)
 	AcceptUsers := make([]string, 0)
 
-	connector := slack.NewConnector(Team, Token)
+	connector := slackConnector.NewConnector(Team, Token)
 	robot := bot.NewBot(connector, nil, BotName, IgnoreUsers, AcceptUsers)
 	robot.Command("ping", "ping pong", func(msg *bot.Event) {
 		msg.Sayf("pong %l", msg.User)
@@ -36,13 +37,38 @@ func main() {
 		msg.Say(res)
 	})
 	robot.Command("channels", "channels", func(msg *bot.Event) {
-		channels, err := msg.Bot.Connector.(*slack.Connector).GetJoinedChannelList()
-		if err != nil {
-			log.Print(err)
+		connector, ok := msg.Bot.Connector.(*slackConnector.Connector)
+		if !ok {
 			return
 		}
-		for _, c := range channels {
-			log.Printf("%s - %s", c.Name, c.Id)
+
+		cursor := ""
+		joinedChannel := make([]slack.Channel, 0)
+		for {
+			channels, nextCursor, err := connector.Client().GetConversations(&slack.GetConversationsParameters{Cursor: cursor})
+			if err != nil {
+				log.Print(err)
+				return
+			}
+			if len(channels) == 0 {
+				break
+			}
+
+			for _, v := range channels {
+				if v.IsMember {
+					joinedChannel = append(joinedChannel, v)
+				}
+			}
+
+			if nextCursor == "" {
+				break
+			} else {
+				cursor = nextCursor
+			}
+		}
+
+		for _, c := range joinedChannel {
+			log.Printf("%s - %s", c.Name, c.ID)
 		}
 	})
 	robot.WatchReaction("thumbsup", func(msg *bot.Event) {
