@@ -15,11 +15,11 @@ func NewTestConnector() *TestConnector {
 	return &TestConnector{}
 }
 
-func (c *TestConnector) Connect() error {
+func (c *TestConnector) Setup() error {
 	return nil
 }
 
-func (c *TestConnector) Listen() error {
+func (c *TestConnector) Start() error {
 	return nil
 }
 

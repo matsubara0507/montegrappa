@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+const (
+	MessageEvent       = "message"
+	UserTypingEvent    = "user_typing"
+	ReactionAddedEvent = "reaction_added"
+	ScheduledEvent     = "scheduled"
+	UnknownEvent       = "unknown"
+)
+
 type EventHandler struct {
 	OnError OnError
 

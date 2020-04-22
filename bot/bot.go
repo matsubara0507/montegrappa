@@ -24,7 +24,8 @@ var (
 type OnError func(*Event)
 
 type Bot struct {
-	Connector   Connector
+	Receiver    Receiver
+	Client      Client
 	Name        string
 	Persistence Persistence
 
@@ -37,12 +38,13 @@ type Bot struct {
 	cancel            context.CancelFunc
 }
 
-func NewBot(connector Connector, persistence Persistence, name string, ignoreUsers []string, acceptUsers []string) *Bot {
+func NewBot(receiver Receiver, client Client, persistence Persistence, name string, ignoreUsers []string, acceptUsers []string) *Bot {
 	if persistence == nil {
 		persistence = &NoneDB{}
 	}
 	return &Bot{
-		Connector:         connector,
+		Receiver:          receiver,
+		Client:            client,
 		Name:              name,
 		Persistence:       persistence,
 		connectErrorChan:  make(chan error),
@@ -72,32 +74,18 @@ func (bot *Bot) Start(ctx context.Context) error {
 				bot.connectRetryCount = 0
 				break
 			}
-
-			if bot.connectRetryCount > maxConnectRetryCount {
-				return ErrFailedConnect
-			}
 		}
 
 	RECEIVE:
 		for {
 			select {
-			case event := <-bot.Connector.ReceivedEvent():
+			case event := <-bot.Receiver.ReceivedEvent():
 				event.Bot = bot
-				if bot.Connector.Async() == true {
-					go bot.eventHandler.Handle(event, true)
-				} else {
-					bot.eventHandler.Handle(event, false)
-					bot.Connector.Idle() <- true
-				}
+				go bot.eventHandler.Handle(event, true)
 			case entry := <-bot.scheduler.TriggeredEvent():
 				e := entry.ToEvent()
 				e.Bot = bot
-				if bot.Connector.Async() {
-					go entry.Execute(e)
-				} else {
-					entry.Execute(e)
-					bot.Connector.Idle() <- true
-				}
+				go entry.Execute(e)
 			case err := <-bot.connectErrorChan:
 				bot.disconnectCount++
 				log.Printf("reconnect: %s", err)
@@ -108,8 +96,6 @@ func (bot *Bot) Start(ctx context.Context) error {
 			}
 		}
 	}
-
-	return nil
 }
 
 func (bot *Bot) Shutdown() error {
@@ -119,14 +105,12 @@ func (bot *Bot) Shutdown() error {
 }
 
 func (bot *Bot) Connect() error {
-	err := bot.Connector.Connect()
-	if err != nil {
+	if err := bot.Receiver.Setup(); err != nil {
 		return err
 	}
 
 	go func() {
-		err := bot.Connector.Listen()
-		if err != nil {
+		if err := bot.Receiver.Start(); err != nil {
 			bot.connectErrorChan <- err
 		}
 	}()
@@ -139,7 +123,7 @@ func (bot *Bot) OnError(f OnError) {
 }
 
 func (bot *Bot) Send(event *Event, text string) {
-	bot.Connector.Send(event, bot.Name, text)
+	bot.Client.Send(event, bot.Name, text)
 }
 
 func (bot *Bot) Sendf(event *Event, format string, a ...interface{}) {
@@ -148,12 +132,12 @@ func (bot *Bot) Sendf(event *Event, format string, a ...interface{}) {
 }
 
 func (bot *Bot) SendWithConfirm(event *Event, text, reaction string, callback func(*Event)) {
-	id, _ := bot.Connector.SendWithConfirm(event, bot.Name, text)
+	id, _ := bot.Client.SendWithConfirm(event, bot.Name, text)
 	bot.eventHandler.RequireReaction(event.Channel, id, reaction, event.User.Id, callback)
 }
 
 func (bot *Bot) SendAndRequestReactFromOther(event *Event, text, reaction string, callback func(*Event)) {
-	id, _ := bot.Connector.SendWithConfirm(event, bot.Name, text)
+	id, _ := bot.Client.SendWithConfirm(event, bot.Name, text)
 	bot.eventHandler.RequireReactionByOther(event.Channel, id, reaction, event.User.Id, callback)
 }
 
@@ -163,7 +147,7 @@ func (bot *Bot) SendWithConfirmf(event *Event, reaction string, callback func(*E
 }
 
 func (bot *Bot) SendRequireResponse(event *Event, text string) (func(), chan string) {
-	bot.Connector.Send(event, bot.Name, text)
+	bot.Client.Send(event, bot.Name, text)
 	return bot.eventHandler.RequireResponse(event.Channel, event.User.Id)
 }
 
@@ -173,21 +157,21 @@ func (bot *Bot) SendRequireResponsef(event *Event, format string, a ...interface
 }
 
 func (bot *Bot) WithIndicate(channel string, f func() error) {
-	cancel := bot.Connector.WithIndicate(channel)
+	cancel := bot.Client.WithIndicate(channel)
 	defer cancel()
 	f()
 }
 
 func (bot *Bot) Attach(event *Event, title, fileName string, file io.Reader) error {
-	return bot.Connector.Attach(event, fileName, file, title)
+	return bot.Client.Attach(event, fileName, file, title)
 }
 
 func (bot *Bot) SendPrivate(event *Event, text string) {
-	bot.Connector.SendPrivate(event, event.User.Id, text)
+	bot.Client.SendPrivate(event, event.User.Id, text)
 }
 
 func (bot *Bot) GetPermalink(event *Event) string {
-	return bot.Connector.GetPermalink(event)
+	return bot.Client.GetPermalink(event)
 }
 
 func (bot *Bot) Hear(pattern string, callback func(*Event)) {

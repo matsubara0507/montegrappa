@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/f110/montegrappa/bot"
-	slackConnector "github.com/f110/montegrappa/slack"
+	"github.com/matsubara0507/montegrappa/bot"
+	connector "github.com/matsubara0507/montegrappa/slack"
 	"github.com/slack-go/slack"
 )
 
@@ -19,8 +19,8 @@ func main() {
 	IgnoreUsers := make([]string, 0)
 	AcceptUsers := make([]string, 0)
 
-	connector := slackConnector.NewConnector(Team, Token)
-	robot := bot.NewBot(connector, nil, BotName, IgnoreUsers, AcceptUsers)
+	conn := connector.NewConnector(Team, Token)
+	robot := bot.NewBot(conn, conn, nil, BotName, IgnoreUsers, AcceptUsers)
 	robot.Command("ping", "ping pong", func(msg *bot.Event) {
 		msg.Sayf("pong %l", msg.User)
 	})
@@ -37,15 +37,10 @@ func main() {
 		msg.Say(res)
 	})
 	robot.Command("channels", "channels", func(msg *bot.Event) {
-		connector, ok := msg.Bot.Connector.(*slackConnector.Connector)
-		if !ok {
-			return
-		}
-
 		cursor := ""
 		joinedChannel := make([]slack.Channel, 0)
 		for {
-			channels, nextCursor, err := connector.Client().GetConversations(&slack.GetConversationsParameters{Cursor: cursor})
+			channels, nextCursor, err := conn.Client().GetConversations(&slack.GetConversationsParameters{Cursor: cursor})
 			if err != nil {
 				log.Print(err)
 				return

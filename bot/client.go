@@ -6,33 +6,14 @@ import (
 	"io"
 )
 
-type Connector interface {
-	Connect() error
-	Listen() error
-	ReceivedEvent() chan *Event
+type Client interface {
 	Send(*Event, string, string) error
 	SendWithConfirm(*Event, string, string) (string, error)
+	SendPrivate(*Event, string, string) error
 	Attach(*Event, string, io.Reader, string) error
 	WithIndicate(string) context.CancelFunc
-	SendPrivate(*Event, string, string) error
-	Async() bool
-	Idle() chan bool
 	GetChannelInfo(string) (*ChannelInfo, error)
 	GetPermalink(*Event) string
-}
-
-const (
-	MessageEvent       = "message"
-	UserTypingEvent    = "user_typing"
-	ReactionAddedEvent = "reaction_added"
-	ScheduledEvent     = "scheduled"
-	UnknownEvent       = "unknown"
-)
-
-type SentMessage struct {
-	Message   string
-	Channel   string
-	Timestamp string
 }
 
 type User struct {

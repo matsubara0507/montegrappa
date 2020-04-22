@@ -20,4 +20,5 @@ jobs:
           go test ./handler
           go test ./persistence
           go test ./slack
-          go build ./example/simple.go
+          go build ./example/connector.go
+          go build ./example/eventsapi.go
