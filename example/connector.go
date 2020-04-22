@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/f110/montegrappa/bot"
-	connector "github.com/f110/montegrappa/slack"
+	"github.com/matsubara0507/montegrappa/bot"
+	connector "github.com/matsubara0507/montegrappa/slack"
 	"github.com/slack-go/slack"
 )
 

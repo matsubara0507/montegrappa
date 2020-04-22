@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/f110/montegrappa/bot"
+	"github.com/matsubara0507/montegrappa/bot"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"net/http"

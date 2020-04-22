@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/f110/montegrappa/bot"
+	"github.com/matsubara0507/montegrappa/bot"
 	"github.com/slack-go/slack"
 )
 

@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/f110/montegrappa/bot"
+	"github.com/matsubara0507/montegrappa/bot"
 )
 
 func init() {
